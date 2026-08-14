@@ -20,27 +20,46 @@ except ImportError:
         _legacy_genai = None
 
 
-def _generate(api_key: str, prompt: str) -> str:
-    """Call Gemini API with the new or legacy SDK."""
-    if not GENAI_AVAILABLE:
-        raise RuntimeError("Chua cai thu vien google-genai. Chay: pip install google-genai")
-    if not api_key:
-        raise ValueError("Chua cau hinh Gemini API Key. Vao tab Cai Dat de nhap.")
+CANDIDATE_MODELS = [
+    "gemini-3.5-flash-lite",
+    "gemini-3.5-flash",
+    "gemini-3.7-flash",
+    "gemini-flash-latest",
+]
 
-    if _genai is not None:
-        # New SDK: google-genai
-        client = _genai.Client(api_key=api_key)
-        response = client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=prompt,
-        )
-        return response.text.strip()
-    else:
-        # Legacy SDK fallback
-        _legacy_genai.configure(api_key=api_key)
-        model = _legacy_genai.GenerativeModel("gemini-2.0-flash")
-        response = model.generate_content(prompt)
-        return response.text.strip()
+def _generate(api_key: str, prompt: str) -> str:
+    """Call Gemini API with the new or legacy SDK using gemini-3.5-flash-lite."""
+    if not GENAI_AVAILABLE:
+        raise RuntimeError("Chưa cài đặt thư viện google-genai / google-generativeai.")
+    if not api_key:
+        raise ValueError("Chưa cấu hình Gemini API Key. Vào tab Cài Đặt để nhập.")
+
+    last_error = None
+    for model_name in CANDIDATE_MODELS:
+        try:
+            if _genai is not None:
+                # New SDK: google-genai
+                client = _genai.Client(api_key=api_key)
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=prompt,
+                )
+                if response and response.text:
+                    return response.text.strip()
+            else:
+                # Legacy SDK fallback
+                _legacy_genai.configure(api_key=api_key)
+                model = _legacy_genai.GenerativeModel(model_name)
+                response = model.generate_content(prompt)
+                if response and response.text:
+                    return response.text.strip()
+        except Exception as err:
+            last_error = err
+            continue
+
+    if last_error:
+        raise last_error
+    raise RuntimeError("Không nhận được phản hồi từ Gemini API.")
 
 
 TRANSLATE_PROMPT = """Ban la chuyen gia dich thuat ho so thuc tap sinh (TTS) Viet Nam sang tieng Nhat.
@@ -120,6 +139,17 @@ def translate_fields(fields: dict, api_key: str) -> dict:
 
 
 def translate_single(field_name: str, value: str, api_key: str) -> Optional[str]:
+    # Direct date conversion if it's a date field or date string
+    if "date" in field_name.lower() or "ngay" in field_name.lower():
+        from datetime import datetime
+        s = value.strip()
+        for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%Y/%m/%d", "%d-%m-%Y", "%d.%m.%Y"):
+            try:
+                d = datetime.strptime(s, fmt)
+                return f"{d.year}年{d.month:02d}月{d.day:02d}日"
+            except ValueError:
+                pass
+
     prompt = f"""Dich gia tri sau sang tieng Nhat cho ho so TTS:
 Truong: {field_name}
 Gia tri: {value}

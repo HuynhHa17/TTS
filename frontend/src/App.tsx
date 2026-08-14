@@ -261,9 +261,12 @@ export default function App() {
             isLoading={isLoading}
             onOpenGoogleSheetImport={() => setIsGoogleSheetImportOpen(true)}
             onSelectCandidate={handleSelectCandidate}
+            onDeleteCandidate={handleDeleteCandidate}
             onDownloadRirekisho={handleDownloadRirekisho}
             onDownloadTcmmxd={handleDownloadTcmmxd}
             dbCandidates={candidates}
+            selectedIds={selectedIds}
+            setSelectedIds={setSelectedIds}
           />
         )}
 
@@ -287,6 +290,7 @@ export default function App() {
             profile={selectedCandidateProfile}
             onSave={handleSaveCandidate}
             onBack={() => setActiveTab('list')}
+            onDelete={handleDeleteCandidate}
             onDownloadRirekisho={handleDownloadRirekisho}
             onDownloadTcmmxd={handleDownloadTcmmxd}
           />

@@ -27,13 +27,6 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         const d = await res.json();
         setIsKeySet(d.gemini_api_key_set);
         setMaskedKey(d.gemini_api_key_masked);
-        if (d.custom_field_defs) {
-          try {
-            setCustomFieldDefs(JSON.parse(d.custom_field_defs));
-          } catch {
-            setCustomFieldDefs([]);
-          }
-        }
       }
     } catch {
       // ignore

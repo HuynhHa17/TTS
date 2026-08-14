@@ -49,27 +49,52 @@ def _to_jp_date(vn_str: str) -> str:
     """Chuyển '28/10/2000' hoặc '2000-10-28' → '2000年10月28日'."""
     if not vn_str:
         return ""
-    try:
-        for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%Y/%m/%d"):
-            try:
-                d = datetime.strptime(vn_str.strip(), fmt)
-                return f"{d.year}年{d.month:02d}月{d.day:02d}日"
-            except ValueError:
-                pass
-    except Exception:
-        pass
-    return vn_str
+    s = str(vn_str).strip()
+    if not s:
+        return ""
+    if "年" in s and "月" in s:
+        return s
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%Y/%m/%d", "%d-%m-%Y", "%d.%m.%Y"):
+        try:
+            d = datetime.strptime(s, fmt)
+            return f"{d.year}年{d.month:02d}月{d.day:02d}日"
+        except ValueError:
+            pass
+    return s
+
+
+def _format_date_vn(val) -> str:
+    """Chuyển date/datetime/chuỗi bất kỳ → định dạng ngày tháng năm VN 'DD/MM/YYYY'."""
+    if not val:
+        return ""
+    if isinstance(val, (datetime, date)):
+        return val.strftime("%d/%m/%Y")
+    s = str(val).strip()
+    if not s:
+        return ""
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%Y/%m/%d", "%d-%m-%Y", "%d.%m.%Y"):
+        try:
+            d = datetime.strptime(s, fmt)
+            return d.strftime("%d/%m/%Y")
+        except ValueError:
+            pass
+    return s
 
 
 def _parse_date_str(val) -> str:
     """Chuyển openpyxl date/datetime → chuỗi YYYY-MM-DD."""
     if val is None:
         return ""
-    if isinstance(val, datetime):
+    if isinstance(val, (datetime, date)):
         return val.strftime("%Y-%m-%d")
-    if isinstance(val, date):
-        return val.strftime("%Y-%m-%d")
-    return _str(val)
+    s = _str(val)
+    for fmt in ("%d/%m/%Y", "%d-%m-%Y", "%d.%m.%Y", "%Y/%m/%d"):
+        try:
+            d = datetime.strptime(s, fmt)
+            return d.strftime("%Y-%m-%d")
+        except ValueError:
+            pass
+    return s
 
 
 # ─────────────────────────────────────────────────────────────
@@ -178,14 +203,26 @@ def _candidate_to_row(c: Candidate, stt: int) -> list:
 
     dob_jp = c.date_of_birth_jp or _to_jp_date(c.date_of_birth)
 
+    def _format_period_date(dt_str):
+        if not dt_str:
+            return ""
+        s = str(dt_str).strip()
+        for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%Y/%m/%d", "%Y-%m", "%m/%Y", "%d-%m-%Y"):
+            try:
+                d = datetime.strptime(s, fmt)
+                return d.strftime("%m/%Y")
+            except ValueError:
+                pass
+        return s
+
     def _edu_period(e):
         if not e:
             return ""
         parts = []
         if e.start_date:
-            parts.append(e.start_date)
+            parts.append(_format_period_date(e.start_date))
         if e.end_date:
-            parts.append(e.end_date)
+            parts.append(_format_period_date(e.end_date))
         return "   ～ ".join(parts) if parts else ""
 
     def _work_period(w):
@@ -193,9 +230,9 @@ def _candidate_to_row(c: Candidate, stt: int) -> list:
             return ""
         parts = []
         if w.start_date:
-            parts.append(w.start_date)
+            parts.append(_format_period_date(w.start_date))
         if w.end_date:
-            parts.append(w.end_date)
+            parts.append(_format_period_date(w.end_date))
         return "   ～ ".join(parts) if parts else ""
 
     def _work_name(w):
@@ -214,16 +251,16 @@ def _candidate_to_row(c: Candidate, stt: int) -> list:
         _str(c.full_name_katakana),                             # 5
         _str(c.gender),                                         # 6
         _str(cccd.document_number if cccd else ""),             # 7
-        _str(cccd.issue_date if cccd else ""),                  # 8
-        _str(cccd.issue_date_jp if cccd else ""),               # 9
+        _format_date_vn(cccd.issue_date if cccd else ""),       # 8
+        _str(cccd.issue_date_jp if cccd else (_to_jp_date(cccd.issue_date) if cccd else "")), # 9
         _str(cccd.issue_place_vn if cccd else ""),              # 10
         _str(cccd.issue_place_jp if cccd else ""),              # 11
         _str(passport.document_number if passport else ""),     # 12
-        _str(passport.issue_date if passport else ""),          # 13
-        _str(passport.issue_date_jp if passport else ""),       # 14
+        _format_date_vn(passport.issue_date if passport else ""),# 13
+        _str(passport.issue_date_jp if passport else (_to_jp_date(passport.issue_date) if passport else "")), # 14
         _str(passport.issue_place_vn if passport else ""),      # 15
         _str(passport.issue_place_jp if passport else ""),      # 16
-        _str(c.date_of_birth),                                  # 17
+        _format_date_vn(c.date_of_birth),                       # 17
         dob_jp,                                                 # 18
         f"{age_str}歳" if age_str else "",                      # 19
         f"{age_str} tuổi" if age_str else "",                   # 20

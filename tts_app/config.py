@@ -4,7 +4,9 @@ TTS App Configuration
 import os
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-ROOT_DIR = os.path.dirname(BASE_DIR)  # d:\TTS
+# BASE_DIR = .../TTS EXCEL/tts_app
+# ROOT_DIR = .../TTS EXCEL  (thư mục gốc workspace)
+ROOT_DIR = os.path.dirname(BASE_DIR)
 
 # File paths
 CV_FILE       = os.path.join(ROOT_DIR, "CVpv.xlsx")

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, Plus, Trash2, Edit, AlertCircle } from 'lucide-react';
+import { Save, Plus, Trash2, Edit } from 'lucide-react';
 import type { CustomFieldDef } from '../types';
 
 interface CustomFieldsModalProps {

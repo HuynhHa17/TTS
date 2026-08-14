@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Zap } from 'lucide-react';
+import { Zap, Trash2, Calendar } from 'lucide-react';
+import { toISODate, toJapaneseDate, formatDateVN } from '../utils/dateFormat';
 import type {
   FullCandidateProfile,
   Candidate,
@@ -15,6 +16,7 @@ interface CandidateEditorProps {
   profile: FullCandidateProfile | null;
   onSave: (data: FullCandidateProfile) => void;
   onBack: () => void;
+  onDelete?: (id: number) => void;
   onDownloadRirekisho: (id: number) => void;
   onDownloadTcmmxd: (id: number) => void;
 }
@@ -125,6 +127,26 @@ function Inp({ value, onChange, placeholder = '', type = 'text', jp = false, row
         placeholder={placeholder} className={cls + ' resize-none'} />
     );
   }
+  if (type === 'date') {
+    const isoVal = toISODate(value);
+    const vnFormatted = formatDateVN(value);
+    return (
+      <div className="flex flex-col gap-1 w-full">
+        <input 
+          type="date" 
+          value={isoVal} 
+          onChange={e => onChange(e.target.value)}
+          placeholder={placeholder || 'DD/MM/YYYY'} 
+          className={cls} 
+        />
+        {vnFormatted && (
+          <span className="text-[11px] font-bold text-[#FF4D00] flex items-center gap-1">
+            <Calendar size={11} /> VN: {vnFormatted}
+          </span>
+        )}
+      </div>
+    );
+  }
   return (
     <input type={type} value={value ?? ''} onChange={e => onChange(e.target.value)}
       placeholder={placeholder} className={cls} />
@@ -187,7 +209,7 @@ const RELATIONSHIPS = ['Bố', 'Mẹ', 'Anh', 'Chị', 'Em', 'Vợ/Chồng', 'Co
 const ALCOHOL_OPTS = ['Không', 'Thỉnh thoảng', 'Thường xuyên'];
 
 // ─── main component ────────────────────────────────────────────────
-export function CandidateEditor({ profile, onSave, onBack, onDownloadRirekisho, onDownloadTcmmxd }: CandidateEditorProps) {
+export function CandidateEditor({ profile, onSave, onBack, onDelete, onDownloadRirekisho, onDownloadTcmmxd }: CandidateEditorProps) {
   const [tab, setTab] = useState('personal');
   const [cand, setCand] = useState<Candidate>(blankCandidate());
   const [docs, setDocs] = useState<IdentityDocument[]>([{ ...blankDoc(), document_type: 'CCCD' }, { ...blankDoc(), document_type: 'Passport' }]);
@@ -408,6 +430,17 @@ export function CandidateEditor({ profile, onSave, onBack, onDownloadRirekisho, 
             <>
               <button onClick={() => onDownloadRirekisho(cand.id)} className="artistic-card-sm px-3 py-1.5 text-xs font-bold hover:bg-[#F0F0F0]">📄 Rirekisho</button>
               <button onClick={() => onDownloadTcmmxd(cand.id)} className="artistic-card-sm px-3 py-1.5 text-xs font-bold hover:bg-[#F0F0F0]">📋 TC MMXD</button>
+              {onDelete && (
+                <button
+                  type="button"
+                  onClick={() => onDelete(cand.id)}
+                  className="border-2 border-[#D32F2F] bg-[#FFF5F5] text-[#D32F2F] px-3 py-1.5 text-xs font-extrabold rounded
+                    flex items-center gap-1 hover:bg-[#D32F2F] hover:text-white transition-all
+                    shadow-[2px_2px_0_0_#D32F2F] hover:shadow-[3px_3px_0_0_#D32F2F] active:shadow-none active:translate-x-0.5 active:translate-y-0.5"
+                >
+                  <Trash2 size={13} /> Xóa
+                </button>
+              )}
             </>
           )}
           <button onClick={handleSave} className="artistic-btn-primary px-5 py-2 text-sm rounded font-bold">💾 Lưu Hồ Sơ</button>
@@ -448,11 +481,23 @@ export function CandidateEditor({ profile, onSave, onBack, onDownloadRirekisho, 
                     </div>
                   </Field>
                   <Field label="Số điện thoại TTS"><Inp value={cand.phone} onChange={v => setC('phone', v)} placeholder="0912 345 678" /></Field>
-                  <Field label="Ngày sinh (VN)"><Inp value={cand.date_of_birth} onChange={v => setC('date_of_birth', v)} type="date" /></Field>
+                  <Field label="Ngày sinh (VN)">
+                    <Inp 
+                      value={cand.date_of_birth} 
+                      onChange={v => {
+                        setC('date_of_birth', v);
+                        const jp = toJapaneseDate(v);
+                        if (jp) {
+                          setC('date_of_birth_jp', jp);
+                        }
+                      }} 
+                      type="date" 
+                    />
+                  </Field>
                   <Field label="Ngày sinh (JP)" jp>
                     <div className="flex gap-2 items-end">
                       <Inp value={cand.date_of_birth_jp} onChange={v => setC('date_of_birth_jp', v)} placeholder="2000年10月28日" jp />
-                      <TranslateBtn fieldName="date_of_birth_jp" value={cand.date_of_birth} onResult={v => setC('date_of_birth_jp', v)} />
+                      <TranslateBtn fieldName="date_of_birth_jp" value={cand.date_of_birth} onResult={v => setC('date_of_birth_jp', toJapaneseDate(v) || v)} />
                     </div>
                   </Field>
                   <Field label="Quốc tịch"><Inp value={cand.nationality} onChange={v => setC('nationality', v)} /></Field>
@@ -464,10 +509,8 @@ export function CandidateEditor({ profile, onSave, onBack, onDownloadRirekisho, 
                 </div>
               </Section>
 
-              <Section title="Địa chỉ">
+              <Section title="Địa chỉ & Nơi sinh">
                 <div className="grid grid-cols-2 gap-x-6 gap-y-4">
-                  <Field label="Nơi sinh (VN)"><Inp value={cand.birthplace_vn} onChange={v => setC('birthplace_vn', v)} placeholder="TP. Hồ Chí Minh" /></Field>
-                  <Field label="Nơi sinh (JP)" jp><Inp value={cand.birthplace_jp} onChange={v => setC('birthplace_jp', v)} jp /></Field>
                   <Field label="Địa chỉ thường trú (VN)"><Inp value={cand.address_vn} onChange={v => setC('address_vn', v)} placeholder="123 Phố X, Quận Y, TP HCM" /></Field>
                   <Field label="Địa chỉ (JP)" jp>
                     <div className="flex gap-2 items-end">
@@ -621,8 +664,30 @@ export function CandidateEditor({ profile, onSave, onBack, onDownloadRirekisho, 
                         opts={[{ label: 'CCCD / CMND', value: 'CCCD' }, { label: 'Hộ chiếu', value: 'Passport' }, { label: 'Khác', value: 'Other' }]} />
                     </Field>
                     <Field label="Số giấy tờ"><Inp value={doc.document_number} onChange={v => setDocs(docs.map((d, j) => j === i ? { ...d, document_number: v } : d))} /></Field>
-                    <Field label="Ngày cấp (VN)"><Inp value={doc.issue_date} onChange={v => setDocs(docs.map((d, j) => j === i ? { ...d, issue_date: v } : d))} type="date" /></Field>
-                    <Field label="Ngày cấp (JP)" jp><Inp value={doc.issue_date_jp} onChange={v => setDocs(docs.map((d, j) => j === i ? { ...d, issue_date_jp: v } : d))} placeholder="2022年04月27日" jp /></Field>
+                    <Field label="Ngày cấp (VN)">
+                      <Inp 
+                        value={doc.issue_date} 
+                        onChange={v => {
+                          const jp = toJapaneseDate(v);
+                          setDocs(docs.map((d, j) => j === i ? { 
+                            ...d, 
+                            issue_date: v, 
+                            issue_date_jp: jp || d.issue_date_jp 
+                          } : d));
+                        }} 
+                        type="date" 
+                      />
+                    </Field>
+                    <Field label="Ngày cấp (JP)" jp>
+                      <div className="flex gap-2 items-end">
+                        <Inp value={doc.issue_date_jp} onChange={v => setDocs(docs.map((d, j) => j === i ? { ...d, issue_date_jp: v } : d))} placeholder="2022年04月27日" jp />
+                        <TranslateBtn
+                          fieldName={`issue_date_${i}`}
+                          value={doc.issue_date}
+                          onResult={v => setDocs(docs.map((d, j) => j === i ? { ...d, issue_date_jp: toJapaneseDate(v) || v } : d))}
+                        />
+                      </div>
+                    </Field>
                     <Field label="Nơi cấp (VN)"><Inp value={doc.issue_place_vn} onChange={v => setDocs(docs.map((d, j) => j === i ? { ...d, issue_place_vn: v } : d))} /></Field>
                     <Field label="Nơi cấp (JP)" jp>
                       <div className="flex gap-2 items-end">

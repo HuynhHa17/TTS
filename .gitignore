@@ -6,16 +6,28 @@ venv/
 env/
 .pytest_cache/
 
-# Database & generated
+# Node / Frontend
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
+
+# Database & temporary outputs
 tts_app/data/*.db
 tts_app/temp/
 temp/
 File_luu.xlsx
+File_lưu.xlsx
+
+# Environment variables & API keys
+.env
+*.env.local
 
 # IDE / OS
 .vscode/
 .idea/
 .DS_Store
+Thumbs.db
 
 # Logs
 *.log
