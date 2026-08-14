@@ -1,0 +1,185 @@
+"""
+exporter.py — Export candidates to File_lưu.xlsx (60-col format)
+"""
+import openpyxl
+from openpyxl.styles import (
+    Font, PatternFill, Alignment, Border, Side, GradientFill
+)
+from openpyxl.utils import get_column_letter
+from datetime import datetime
+import re
+
+from core.models import COL60_HEADERS, Candidate
+
+
+# ── Style helpers ─────────────────────────────────────────────────────────────
+
+_HEADER_FILL  = PatternFill("solid", fgColor="1E3A5F")
+_HEADER_FONT  = Font(name="Arial", bold=True, color="FFFFFF", size=9)
+_DATA_FONT    = Font(name="Arial", size=9)
+_CENTER       = Alignment(horizontal="center", vertical="center", wrap_text=True)
+_LEFT         = Alignment(horizontal="left",   vertical="center", wrap_text=True)
+_THIN         = Side(style="thin", color="AAAAAA")
+_BORDER       = Border(left=_THIN, right=_THIN, top=_THIN, bottom=_THIN)
+_FILL_ALT     = PatternFill("solid", fgColor="F0F4FA")
+
+# Column widths (approximate)
+_COL_WIDTHS = [
+    5, 12, 22, 22, 22, 8, 18,
+    18, 18, 30, 30,
+    16, 18, 18, 30, 30,
+    18, 18, 8, 10,
+    40, 40, 20, 20,
+    35, 35, 40, 40, 16,
+    20, 35, 20, 35, 20, 35,
+    20, 35, 20, 35, 20, 35,
+    25, 25, 12, 12,
+    35, 35, 40, 40, 25, 25,
+    35, 35, 40, 40, 25, 25,
+    30, 25, 16,
+]
+
+
+def _style_header_row(ws, row: int, ncols: int):
+    for c in range(1, ncols + 1):
+        cell = ws.cell(row=row, column=c)
+        cell.fill   = _HEADER_FILL
+        cell.font   = _HEADER_FONT
+        cell.border = _BORDER
+        cell.alignment = _CENTER
+
+
+def _style_data_row(ws, row: int, ncols: int, alt: bool = False):
+    fill = _FILL_ALT if alt else None
+    for c in range(1, ncols + 1):
+        cell = ws.cell(row=row, column=c)
+        if fill:
+            cell.fill = fill
+        cell.font   = _DATA_FONT
+        cell.border = _BORDER
+        cell.alignment = _LEFT
+
+
+def _set_col_widths(ws, widths: list):
+    for i, w in enumerate(widths, 1):
+        ws.column_dimensions[get_column_letter(i)].width = w
+
+
+# ── Main sheet builder ────────────────────────────────────────────────────────
+
+def build_master_sheet(ws, candidates: list, sheet_name: str = None):
+    """Write candidates to a master sheet with 60-col format."""
+    ws.title = sheet_name or f"Thang {datetime.now().strftime('%m')}"
+    ws.freeze_panes = "B2"
+
+    # Header
+    headers = ["STT"] + COL60_HEADERS[1:]  # exclude col 0 which is STT
+    for col_idx, h in enumerate(COL60_HEADERS, 1):
+        ws.cell(row=1, column=col_idx, value=h)
+    _style_header_row(ws, 1, len(COL60_HEADERS))
+    _set_col_widths(ws, _COL_WIDTHS)
+    ws.row_dimensions[1].height = 30
+
+    keys = Candidate.col60_keys()
+
+    for row_idx, cand in enumerate(candidates, 2):
+        alt = (row_idx % 2 == 0)
+        for col_idx, key in enumerate(keys, 1):
+            val = cand.get(key) if isinstance(cand, dict) else getattr(cand, key, None)
+            if key == "id":
+                val = row_idx - 1  # STT
+            if val is None:
+                val = ""
+            ws.cell(row=row_idx, column=col_idx, value=val)
+        _style_data_row(ws, row_idx, len(keys), alt)
+        ws.row_dimensions[row_idx].height = 20
+
+    # Auto-filter
+    ws.auto_filter.ref = f"A1:{get_column_letter(len(COL60_HEADERS))}1"
+
+
+def build_syndicate_sheet(ws, syndicates: list):
+    ws.title = "Nghiệp đoàn"
+    headers = [
+        "STT", "TEN ND VNM", "TEN ND JPN",
+        "CHU TICH ND VNM", "CHU TICH ND JPN",
+        "D/C NGHIEP DOAN VNM", "D/C NGHIEP DOAN JPN", "SDT JAPAN"
+    ]
+    fields = [
+        "id", "ten_vnm", "ten_jpn",
+        "chu_tich_vnm", "chu_tich_jpn",
+        "dia_chi_vnm", "dia_chi_jpn", "so_dien_thoai"
+    ]
+    for c, h in enumerate(headers, 1):
+        ws.cell(row=2, column=c, value=h)
+    _style_header_row(ws, 2, len(headers))
+    ws.column_dimensions["A"].width = 5
+    for c in range(2, len(headers) + 1):
+        ws.column_dimensions[get_column_letter(c)].width = 35
+
+    for r, s in enumerate(syndicates, 3):
+        for c, f in enumerate(fields, 1):
+            val = s.get(f) if isinstance(s, dict) else getattr(s, f, None)
+            if f == "id":
+                val = r - 2
+            ws.cell(row=r, column=c, value=val or "")
+        _style_data_row(ws, r, len(fields), r % 2 == 0)
+
+
+def build_company_sheet(ws, companies: list):
+    ws.title = "Chủ sử dụng"
+    headers = [
+        "STT", "TEN TO CHUC THUC TAP VNM", "TEN TO CHUC THUC TAP JPN",
+        "TEN GIAM DOC VNM", "TEN GD JPN",
+        "D/C THUC TAP VNM", "D/C THUC TAP JPN", "SO DIEN THOAI"
+    ]
+    fields = [
+        "id", "ten_vnm", "ten_jpn",
+        "giam_doc_vnm", "giam_doc_jpn",
+        "dia_chi_vnm", "dia_chi_jpn", "so_dien_thoai"
+    ]
+    for c, h in enumerate(headers, 1):
+        ws.cell(row=2, column=c, value=h)
+    _style_header_row(ws, 2, len(headers))
+    ws.column_dimensions["A"].width = 5
+    for c in range(2, len(headers) + 1):
+        ws.column_dimensions[get_column_letter(c)].width = 35
+
+    for r, co in enumerate(companies, 3):
+        for c, f in enumerate(fields, 1):
+            val = co.get(f) if isinstance(co, dict) else getattr(co, f, None)
+            if f == "id":
+                val = r - 2
+            ws.cell(row=r, column=c, value=val or "")
+        _style_data_row(ws, r, len(fields), r % 2 == 0)
+
+
+def export_to_excel(
+    candidates: list,
+    syndicates: list,
+    companies: list,
+    output_path: str,
+    sheet_name: str = None,
+):
+    """
+    Build and save File_lưu.xlsx with:
+      - Sheet 1: Master 60 cột
+      - Sheet 2: Nghiệp đoàn
+      - Sheet 3: Chủ sử dụng
+    """
+    wb = openpyxl.Workbook()
+
+    # Sheet 1 — Master
+    ws1 = wb.active
+    build_master_sheet(ws1, candidates, sheet_name)
+
+    # Sheet 2 — Syndicates
+    ws2 = wb.create_sheet()
+    build_syndicate_sheet(ws2, syndicates)
+
+    # Sheet 3 — Companies
+    ws3 = wb.create_sheet()
+    build_company_sheet(ws3, companies)
+
+    wb.save(output_path)
+    return output_path
