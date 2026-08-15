@@ -15,6 +15,7 @@ frontend/dist/
 # Database & temporary outputs
 tts_app/data/*.db
 tts_app/data/*.bak
+tts_app/data/backups/
 tts_app/temp/
 temp/
 File_luu.xlsx
