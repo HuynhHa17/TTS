@@ -46,5 +46,16 @@ if __name__ == "__main__":
     print(f"   Output   : {config.OUTPUT_FILE}")
     print(f"   Database : {config.DB_PATH}")
     init_db()
+
+    # Auto-backup khi khởi động
+    try:
+        from core.backup import create_backup
+        bp = create_backup(reason="startup")
+        if bp:
+            print(f"   ✅ Backup: {os.path.basename(bp)}")
+    except Exception as e:
+        print(f"   ⚠️ Backup failed: {e}")
+
     print(f"\n[OK] Mo trinh duyet: http://localhost:{config.PORT}\n")
     app.run(debug=config.DEBUG, port=config.PORT, use_reloader=False)
+

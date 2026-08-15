@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { BatchExportModal } from './components/BatchExportModal';
 import { CandidateEditor } from './components/CandidateEditor';
 import { CandidateList } from './components/CandidateList';
@@ -10,7 +10,11 @@ import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
 import { TemplateManagerModal } from './components/TemplateManagerModal';
 import { SettingsModal } from './components/SettingsModal';
 import { CustomFieldsModal } from './components/CustomFieldsModal';
+import { ToastContainer, type ToastData, type ToastType } from './components/Toast';
+import { ConfirmDialog, type ConfirmDialogData } from './components/ConfirmDialog';
 import type { Candidate, FullCandidateProfile } from './types';
+
+let toastCounter = 0;
 
 export default function App() {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
@@ -24,6 +28,38 @@ export default function App() {
   const [isExcelConfigOpen, setIsExcelConfigOpen] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isCustomFieldsOpen, setIsCustomFieldsOpen] = useState<boolean>(false);
+
+  // Toast & Confirm state
+  const [toasts, setToasts] = useState<ToastData[]>([]);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogData | null>(null);
+
+  // ── Toast helpers ──
+  const showToast = useCallback((type: ToastType, title: string, message?: string, duration?: number) => {
+    const id = `toast-${++toastCounter}`;
+    setToasts(prev => [...prev, { id, type, title, message, duration }]);
+  }, []);
+
+  const dismissToast = useCallback((id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  }, []);
+
+  // ── Confirm helper (returns Promise<boolean>) ──
+  const showConfirm = useCallback((opts: {
+    title: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    type?: 'danger' | 'warning' | 'info';
+    icon?: 'delete' | 'reload' | 'import' | 'warning';
+  }): Promise<boolean> => {
+    return new Promise((resolve) => {
+      setConfirmDialog({
+        ...opts,
+        onConfirm: () => { setConfirmDialog(null); resolve(true); },
+        onCancel: () => { setConfirmDialog(null); resolve(false); },
+      });
+    });
+  }, []);
 
   useEffect(() => {
     fetchCandidates();
@@ -169,24 +205,34 @@ export default function App() {
 
       if (res.ok) {
         const saved = await res.json();
-        alert('Lưu hồ sơ thành công vào SQLite Engine!');
+        showToast('success', 'Lưu hồ sơ thành công', 'Dữ liệu đã được lưu vào database và đồng bộ ra Excel.');
         fetchCandidates();
         setSelectedCandidateProfile(saved);
         setActiveTab('list');
       } else {
-        alert('Có lỗi xảy ra khi lưu hồ sơ.');
+        const d = await res.json().catch(() => ({}));
+        showToast('error', 'Lỗi lưu hồ sơ', d.error || 'Có lỗi xảy ra khi lưu hồ sơ. Vui lòng thử lại.');
       }
     } catch (e) {
       console.error(e);
-      alert('Không thể kết nối đến server backend.');
+      showToast('error', 'Lỗi kết nối', 'Không thể kết nối đến server backend.');
     }
   };
 
   const handleDeleteCandidate = async (id: number) => {
-    if (!confirm('Bạn có chắc chắn muốn xóa hồ sơ ứng viên này khỏi SQLite?')) return;
+    const confirmed = await showConfirm({
+      title: 'Xóa hồ sơ ứng viên',
+      message: 'Bạn có chắc chắn muốn xóa hồ sơ ứng viên này? Hành động này không thể hoàn tác.',
+      confirmText: 'Xóa',
+      cancelText: 'Hủy',
+      type: 'danger',
+      icon: 'delete',
+    });
+    if (!confirmed) return;
     try {
       const res = await fetch(`/api/candidates/${id}`, { method: 'DELETE' });
       if (res.ok) {
+        showToast('success', 'Đã xóa hồ sơ', 'Hồ sơ ứng viên đã được xóa thành công.');
         fetchCandidates();
         if (selectedCandidateProfile?.candidate.id === id) {
           setSelectedCandidateProfile(null);
@@ -194,6 +240,7 @@ export default function App() {
       }
     } catch (e) {
       console.error(e);
+      showToast('error', 'Lỗi xóa hồ sơ', 'Không thể xóa hồ sơ. Vui lòng thử lại.');
     }
   };
 
@@ -207,6 +254,53 @@ export default function App() {
 
   const handleDownloadKhaiTtMaster = () => {
     window.open('/api/documents/khai-tt', '_blank');
+  };
+
+  const handleOpenExcel = async () => {
+    try {
+      const res = await fetch('/api/excel/open');
+      if (res.ok) {
+        showToast('success', 'Đã mở file Excel', 'File Excel đã được mở bằng ứng dụng mặc định.');
+      } else {
+        const d = await res.json();
+        showToast('error', 'Lỗi mở file', d.error || 'Không thể mở file Excel.');
+      }
+    } catch (e) {
+      console.error(e);
+      showToast('error', 'Lỗi kết nối', 'Không thể kết nối đến server backend.');
+    }
+  };
+
+  const handleReloadFromExcel = async () => {
+    const confirmed = await showConfirm({
+      title: 'Đồng bộ Excel → SQLite',
+      message: '• Dữ liệu thay đổi trong Excel sẽ cập nhật vào DB\n• Dòng mới trong Excel sẽ được thêm\n• Hồ sơ đã xóa trong Excel sẽ bị xóa khỏi DB\n• Database sẽ được tự động backup trước khi reload',
+      confirmText: 'Reload',
+      cancelText: 'Hủy',
+      type: 'warning',
+      icon: 'reload',
+    });
+    if (!confirmed) return;
+    try {
+      const res = await fetch('/api/excel/reload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sync_delete: true }),
+      });
+      const d = await res.json();
+      if (res.ok) {
+        showToast('success', 'Reload hoàn tất',
+          `📊 Tổng dòng Excel: ${d.total_excel_rows}\n➕ Thêm mới: ${d.created}\n🔄 Cập nhật: ${d.updated}\n⏭️ Không đổi: ${d.unchanged}${d.deleted ? `\n🗑️ Đã xóa: ${d.deleted}` : ''}${d.errors?.length ? `\n❌ Lỗi: ${d.errors.length}` : ''}${d.backup ? `\n💾 Backup: ${d.backup}` : ''}`,
+          8000
+        );
+        fetchCandidates();
+      } else {
+        showToast('error', 'Lỗi Reload', d.error);
+      }
+    } catch (e) {
+      console.error(e);
+      showToast('error', 'Lỗi kết nối', 'Không thể kết nối đến server backend.');
+    }
   };
 
   const handleTriggerBatchExportZip = async (ids: number[], templates: string[]) => {
@@ -227,11 +321,11 @@ export default function App() {
         a.click();
         a.remove();
       } else {
-        alert('Lỗi xuất file ZIP.');
+        showToast('error', 'Lỗi xuất ZIP', 'Có lỗi xảy ra khi xuất file ZIP.');
       }
     } catch (e) {
       console.error(e);
-      alert('Không thể tải tập tin ZIP.');
+      showToast('error', 'Lỗi tải file', 'Không thể tải tập tin ZIP.');
     }
   };
 
@@ -253,6 +347,8 @@ export default function App() {
         onOpenExcelConfig={() => setIsExcelConfigOpen(true)}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenCustomFields={() => setIsCustomFieldsOpen(true)}
+        onOpenExcel={handleOpenExcel}
+        onReloadFromExcel={handleReloadFromExcel}
       />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -339,6 +435,12 @@ export default function App() {
         isOpen={isCustomFieldsOpen}
         onClose={() => setIsCustomFieldsOpen(false)}
       />
+
+      {/* Toast Notifications */}
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+
+      {/* Confirm Dialog */}
+      <ConfirmDialog dialog={confirmDialog} />
 
     </div>
   );

@@ -91,8 +91,8 @@ class IdentityDocument(Base):
     __tablename__ = 'identity_documents'
     id = Column(Integer, primary_key=True, autoincrement=True)
     candidate_id = Column(Integer, ForeignKey('candidates.id'), nullable=False)
-    document_type = Column(String(50), nullable=False) # CCCD, Passport, vb.
-    document_number = Column(String(50), nullable=False)
+    document_type = Column(String(50), nullable=True)  # CCCD, Passport, vb.
+    document_number = Column(String(50), nullable=True)
     issue_date = Column(String(50), nullable=True)
     issue_date_jp = Column(String(50), nullable=True)
     issue_place_vn = Column(String(200), nullable=True)

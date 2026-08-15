@@ -1,4 +1,4 @@
-import { Keyboard, Plus, Upload, Download, Settings, Users, Table2, Settings as SettingsIcon } from 'lucide-react';
+import { Keyboard, Plus, Upload, Download, Settings, Users, Table2, Settings as SettingsIcon, FileSpreadsheet, RefreshCw } from 'lucide-react';
 
 interface HeaderProps {
   activeTab: string;
@@ -11,6 +11,8 @@ interface HeaderProps {
   onOpenExcelConfig: () => void;
   onOpenSettings: () => void;
   onOpenCustomFields: () => void;
+  onOpenExcel: () => void;
+  onReloadFromExcel: () => void;
 }
 
 export function Header({
@@ -22,6 +24,8 @@ export function Header({
   onOpenExcelConfig,
   onOpenSettings,
   onOpenCustomFields,
+  onOpenExcel,
+  onReloadFromExcel,
 }: HeaderProps) {
   return (
     <header className="sticky top-0 z-50 bg-[#F8F7F2] border-b-2 border-[#1A1A1A] px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between shadow-[0_2px_0_0_#1A1A1A]">
@@ -60,6 +64,22 @@ export function Header({
           className="artistic-btn-secondary px-3 py-2 text-sm flex items-center gap-2 rounded-md"
         >
           <Upload size={16} /> GSheet
+        </button>
+
+        <button
+          onClick={onOpenExcel}
+          className="px-3 py-2 text-sm flex items-center gap-2 font-bold rounded-md border-2 border-[#1A1A1A] bg-[#4CAF50] text-white shadow-[2px_2px_0_0_#1A1A1A] hover:shadow-[1px_1px_0_0_#1A1A1A] hover:translate-x-[1px] hover:translate-y-[1px] transition-all"
+          title="Mở file Excel bằng ứng dụng"
+        >
+          <FileSpreadsheet size={16} /> Mở Excel
+        </button>
+
+        <button
+          onClick={onReloadFromExcel}
+          className="px-3 py-2 text-sm flex items-center gap-2 font-bold rounded-md border-2 border-[#1A1A1A] bg-[#2196F3] text-white shadow-[2px_2px_0_0_#1A1A1A] hover:shadow-[1px_1px_0_0_#1A1A1A] hover:translate-x-[1px] hover:translate-y-[1px] transition-all"
+          title="Đồng bộ ngược Excel → SQLite"
+        >
+          <RefreshCw size={16} /> Reload
         </button>
 
         <button
@@ -111,3 +131,4 @@ export function Header({
     </header>
   );
 }
+

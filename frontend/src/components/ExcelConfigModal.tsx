@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FolderOpen, Eye, Download, Upload, RefreshCw } from 'lucide-react';
+import { FolderOpen, Eye, Download, Upload, RefreshCw, FileSpreadsheet } from 'lucide-react';
 
 interface ExcelConfigModalProps {
   isOpen: boolean;
@@ -56,7 +56,7 @@ export function ExcelConfigModal({ isOpen, onClose, onImportComplete }: ExcelCon
   };
 
   const handleImport = async () => {
-    if (!confirm('Import sẽ thêm dữ liệu mới từ Excel vào SQLite (bỏ qua dữ liệu trùng). Tiếp tục?')) return;
+    if (!window.confirm('Import sẽ thêm dữ liệu mới từ Excel vào SQLite (bỏ qua dữ liệu trùng). Tiếp tục?')) return;
     setActiveAction('import');
     setMsg('loading', 'Đang import...');
     try {
@@ -66,6 +66,33 @@ export function ExcelConfigModal({ isOpen, onClose, onImportComplete }: ExcelCon
         setMsg('success', `✅ Xong! Thêm mới: ${d.created} | Bỏ qua (trùng): ${d.skipped}${d.errors?.length ? ` | Lỗi: ${d.errors.length}` : ''}`);
         onImportComplete();
       } else setMsg('error', `❌ ${d.error}`);
+    } catch { setMsg('error', '❌ Không kết nối được backend.'); }
+    finally { setActiveAction(null); }
+  };
+
+  const handleReload = async () => {
+    if (!window.confirm('Đồng bộ ngược Excel → SQLite?\n\n• Dữ liệu đã thay đổi trong Excel sẽ cập nhật vào DB\n• Dòng mới trong Excel sẽ được thêm\n• Database sẽ được tự động backup trước khi reload')) return;
+    setActiveAction('reload');
+    setMsg('loading', 'Đang reload...');
+    try {
+      const res = await fetch('/api/excel/reload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      const d = await res.json();
+      if (res.ok) {
+        setMsg('success', `✅ Xong! Thêm mới: ${d.created} | Cập nhật: ${d.updated} | Không đổi: ${d.unchanged}${d.errors?.length ? ` | Lỗi: ${d.errors.length}` : ''}${d.backup ? ` | Backup: ${d.backup}` : ''}`);
+        onImportComplete();
+      } else setMsg('error', `❌ ${d.error}`);
+    } catch { setMsg('error', '❌ Không kết nối được backend.'); }
+    finally { setActiveAction(null); }
+  };
+
+  const handleOpenExcel = async () => {
+    setActiveAction('open');
+    setMsg('loading', 'Đang mở file...');
+    try {
+      const res = await fetch('/api/excel/open');
+      const d = await res.json();
+      if (res.ok) setMsg('success', `✅ Đã mở file: ${d.path}`);
+      else setMsg('error', `❌ ${d.error}`);
     } catch { setMsg('error', '❌ Không kết nối được backend.'); }
     finally { setActiveAction(null); }
   };
@@ -161,7 +188,7 @@ export function ExcelConfigModal({ isOpen, onClose, onImportComplete }: ExcelCon
                   onClick: handlePreview,
                 },
                 {
-                  id: 'import', icon: <Upload size={20} />, label: 'Import', sub: 'Excel → SQLite',
+                  id: 'import', icon: <Upload size={20} />, label: 'Import', sub: 'Excel → SQLite (thêm mới)',
                   bg: '#FFD700', border: '#1A1A1A', shadow: '#1A1A1A', textColor: '#1A1A1A',
                   onClick: handleImport,
                 },
@@ -190,10 +217,45 @@ export function ExcelConfigModal({ isOpen, onClose, onImportComplete }: ExcelCon
               ))}
             </div>
 
+            {/* Row 2: Reload + Open */}
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                {
+                  id: 'reload', icon: <RefreshCw size={20} />, label: 'Reload', sub: 'Excel → SQLite (cập nhật + thêm mới)',
+                  bg: '#2196F3', border: '#1A1A1A', shadow: '#1A1A1A', textColor: '#FFFFFF',
+                  onClick: handleReload,
+                },
+                {
+                  id: 'open', icon: <FileSpreadsheet size={20} />, label: 'Mở Excel', sub: 'Mở file bằng ứng dụng',
+                  bg: '#4CAF50', border: '#1A1A1A', shadow: '#1A1A1A', textColor: '#FFFFFF',
+                  onClick: handleOpenExcel,
+                },
+              ].map(action => (
+                <button key={action.id} onClick={action.onClick} disabled={activeAction !== null}
+                  className="p-4 rounded-xl border-2 text-center transition-all disabled:opacity-60 hover:-translate-y-0.5 active:translate-y-0.5"
+                  style={{
+                    background: action.bg,
+                    borderColor: action.border,
+                    boxShadow: `3px 3px 0 0 ${action.shadow}`,
+                    color: action.textColor,
+                  }}>
+                  <div className="flex justify-center mb-2">
+                    {activeAction === action.id
+                      ? <span className="animate-spin inline-block w-5 h-5 border-2 border-current/30 border-t-current rounded-full" />
+                      : action.icon}
+                  </div>
+                  <div className="text-xs font-extrabold uppercase">{action.label}</div>
+                  <div className="text-[10px] mt-0.5 opacity-70 font-medium">{action.sub}</div>
+                </button>
+              ))}
+            </div>
+
             {/* Info */}
             <div className="bg-white border-2 border-[#1A1A1A]/10 rounded-lg px-4 py-3 text-xs text-[#777] space-y-1">
               <p>• <strong className="text-[#333]">Import</strong>: thêm mới, bỏ qua trùng (theo mã HS hoặc tên + ngày sinh)</p>
-              <p>• <strong className="text-[#333]">Export</strong>: ghi đè sheet chính, giữ nguyên sheet phụ (Nghiệp đoàn, Chủ sử dụng...)</p>
+              <p>• <strong className="text-[#333]">Reload</strong>: đồng bộ ngược — cập nhật thay đổi + thêm mới từ Excel, auto-backup trước khi chạy</p>
+              <p>• <strong className="text-[#333]">Export</strong>: ghi đè sheet chính, giữ nguyên sheet phụ</p>
+              <p>• <strong className="text-[#333]">Mở Excel</strong>: mở file bằng Excel/LibreOffice trên máy</p>
               <p>• Đổi đường dẫn để liên kết file Excel khác</p>
             </div>
           </div>

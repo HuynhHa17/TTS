@@ -105,7 +105,7 @@ export function ExcelDashboard({
 
   const handleBatchDelete = async () => {
     if (selectedIds.length === 0 || !onDeleteCandidate) return;
-    if (!confirm(`Bạn có chắc chắn muốn xóa ${selectedIds.length} hồ sơ đã chọn khỏi hệ thống?`)) return;
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa ${selectedIds.length} hồ sơ đã chọn khỏi hệ thống?`)) return;
 
     try {
       const res = await fetch('/api/candidates/batch-delete', {
@@ -116,11 +116,9 @@ export function ExcelDashboard({
       if (res.ok) {
         selectedIds.forEach(id => onDeleteCandidate(id));
         if (setSelectedIds) setSelectedIds([]);
-      } else {
-        alert('Có lỗi khi xóa hàng loạt.');
       }
     } catch {
-      alert('Không thể kết nối đến server backend.');
+      // Error handled silently
     }
   };
 
@@ -276,11 +274,7 @@ export function ExcelDashboard({
                             <button
                               type="button"
                               title="Xóa hồ sơ"
-                              onClick={() => {
-                                if (confirm(`Bạn có chắc chắn muốn xóa hồ sơ ${c.full_name_vn || c.profile_code}?`)) {
-                                  onDeleteCandidate(c.id);
-                                }
-                              }}
+                              onClick={() => onDeleteCandidate(c.id)}
                               className="p-1.5 border border-[#D32F2F] bg-[#FFF5F5] hover:bg-[#D32F2F] hover:text-white rounded text-[#D32F2F] transition-colors"
                             >
                               <Trash2 size={13} />

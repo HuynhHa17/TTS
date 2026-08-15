@@ -345,7 +345,12 @@ export function CandidateEditor({ profile, onSave, onBack, onDelete, onDownloadR
   const setC = (field: keyof Candidate, value: unknown) =>
     setCand(prev => ({ ...prev, [field]: value }));
 
-  const handleSave = () => {
+  // ── Soft validation: warn but don't block ──────────────────
+  const [showMissingConfirm, setShowMissingConfirm] = useState(false);
+  const [missingFields, setMissingFields] = useState<string[]>([]);
+
+  const doSave = () => {
+    setShowMissingConfirm(false);
     onSave({
       candidate: cand,
       identityDocuments: docs,
@@ -361,6 +366,31 @@ export function CandidateEditor({ profile, onSave, onBack, onDelete, onDownloadR
         internship_field_jp: internshipFieldJp,
       },
     });
+  };
+
+  const handleSave = () => {
+    const missing: string[] = [];
+    if (!cand.full_name_vn?.trim()) missing.push('Họ tên (Tiếng Việt)');
+    if (!cand.gender?.trim()) missing.push('Giới tính');
+    if (!cand.date_of_birth?.trim()) missing.push('Ngày sinh');
+    if (!cand.phone?.trim()) missing.push('Số điện thoại');
+    if (!cand.address_vn?.trim()) missing.push('Địa chỉ VN');
+    if (!cand.marital_status?.trim()) missing.push('Tình trạng hôn nhân');
+
+    // CCCD
+    const cccd = docs.find(d => d.document_type === 'CCCD');
+    if (!cccd?.document_number?.trim()) missing.push('Số CCCD');
+
+    // Passport  
+    const psp = docs.find(d => d.document_type === 'Passport');
+    if (!psp?.document_number?.trim()) missing.push('Số Passport');
+
+    if (missing.length > 0) {
+      setMissingFields(missing);
+      setShowMissingConfirm(true);
+    } else {
+      doSave();
+    }
   };
 
   const TABS = [
@@ -897,6 +927,68 @@ export function CandidateEditor({ profile, onSave, onBack, onDelete, onDownloadR
 
         </div>
       </div>
+
+      {/* ── Missing Fields Confirmation Modal ── */}
+      {showMissingConfirm && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setShowMissingConfirm(false)}
+          />
+          {/* Dialog */}
+          <div
+            className="relative bg-white border-3 border-[#1A1A1A] rounded-xl shadow-[6px_6px_0_#1A1A1A] max-w-md w-full animate-[popIn_0.25s_ease-out]"
+          >
+            {/* Header */}
+            <div className="flex items-center gap-3 px-6 py-4 border-b-2 border-[#1A1A1A]/10 bg-[#FFF8E1] rounded-t-xl">
+              <div className="w-10 h-10 rounded-lg bg-[#FFB300] border-2 border-[#1A1A1A] shadow-[2px_2px_0_#1A1A1A] flex items-center justify-center text-xl">
+                ⚠️
+              </div>
+              <div>
+                <h3 className="font-extrabold text-[#1A1A1A] text-base">Hồ sơ còn thiếu thông tin</h3>
+                <p className="text-xs text-[#666] mt-0.5">Bạn có thể bổ sung sau hoặc lưu ngay</p>
+              </div>
+            </div>
+
+            {/* Missing fields list */}
+            <div className="px-6 py-4 max-h-60 overflow-y-auto">
+              <p className="text-sm font-bold text-[#444] mb-3">
+                Các trường còn trống ({missingFields.length}):
+              </p>
+              <ul className="space-y-1.5">
+                {missingFields.map((field, i) => (
+                  <li key={i} className="flex items-center gap-2 text-sm text-[#555]">
+                    <span className="w-5 h-5 rounded-full bg-[#FF4D00]/10 border border-[#FF4D00]/30 flex items-center justify-center text-[10px] font-bold text-[#FF4D00]">
+                      {i + 1}
+                    </span>
+                    {field}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center gap-3 px-6 py-4 border-t-2 border-[#1A1A1A]/10 bg-[#FAFAF7] rounded-b-xl">
+              <button
+                type="button"
+                onClick={() => setShowMissingConfirm(false)}
+                className="flex-1 px-4 py-2.5 text-sm font-bold border-2 border-[#1A1A1A] rounded-lg bg-white hover:bg-[#F0F0F0] shadow-[2px_2px_0_#1A1A1A] hover:shadow-[1px_1px_0_#1A1A1A] active:shadow-none transition-all"
+              >
+                ← Quay lại bổ sung
+              </button>
+              <button
+                type="button"
+                onClick={doSave}
+                className="flex-1 px-4 py-2.5 text-sm font-bold border-2 border-[#1A1A1A] rounded-lg bg-[#FF4D00] text-white hover:bg-[#E64500] shadow-[2px_2px_0_#1A1A1A] hover:shadow-[1px_1px_0_#1A1A1A] active:shadow-none transition-all"
+              >
+                Lưu ngay ✓
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

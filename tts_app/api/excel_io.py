@@ -6,6 +6,8 @@ Endpoints:
   POST /api/excel/import           — import từ Excel → SQLite (SQLite là master)
   GET  /api/excel/export           — xuất SQLite → ghi vào Excel
   GET  /api/excel/preview          — preview dữ liệu Excel (không import)
+  POST /api/excel/reload           — đồng bộ ngược Excel → SQLite (smart merge)
+  GET  /api/excel/open             — mở file Excel bằng ứng dụng mặc định
 """
 import os
 import re
@@ -657,3 +659,329 @@ def export_template():
         download_name="Form_Mau_TTS.xlsx",
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
+
+
+# ─────────────────────────────────────────────────────────────
+# RELOAD: Đồng bộ ngược Excel → SQLite (smart merge)
+# ─────────────────────────────────────────────────────────────
+
+@excel_io_bp.route("/excel/reload", methods=["POST"])
+def reload_from_excel():
+    """Đọc File Excel → so sánh với SQLite → cập nhật/thêm mới.
+
+    Logic:
+    - Match theo profile_code hoặc (full_name_vn + date_of_birth)
+    - Đã tồn tại → UPDATE các trường đã thay đổi
+    - Chưa tồn tại → INSERT mới
+    - Trong SQLite nhưng không trong Excel → GIỮ NGUYÊN (an toàn)
+    """
+    db = get_session()
+    try:
+        # Auto-backup trước khi reload
+        try:
+            from core.backup import create_backup
+            backup_path = create_backup(reason="before_reload")
+        except Exception:
+            backup_path = None
+
+        data = request.get_json() or {}
+        path = data.get("path") or _get_excel_path(db)
+        if not os.path.isfile(path):
+            return jsonify({"error": f"File không tồn tại: {path}"}), 404
+
+        wb = openpyxl.load_workbook(path, data_only=True)
+        ws = wb.active
+
+        created = 0
+        updated = 0
+        unchanged = 0
+        deleted = 0
+        errors = []
+        total_rows = 0
+        excel_profile_codes = set()   # Track what's in Excel
+        excel_names_dob = set()       # fallback match key
+
+        for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+            if not any(c for c in row):
+                continue
+            total_rows += 1
+            row = list(row)
+
+            try:
+                d = _row_to_candidate_dict(row)
+                cand_data = d["candidate"]
+                name_vn = cand_data.get("full_name_vn", "").strip()
+                if not name_vn:
+                    continue
+
+                profile_code = cand_data.get("profile_code", "").strip()
+                if profile_code:
+                    excel_profile_codes.add(profile_code)
+                dob = cand_data.get("date_of_birth", "").strip()
+                excel_names_dob.add((name_vn, dob))
+
+                # Tìm ứng viên đã tồn tại
+                existing = None
+                if profile_code:
+                    existing = db.query(Candidate).filter(
+                        Candidate.profile_code == profile_code).first()
+                if not existing:
+                    existing = db.query(Candidate).filter(
+                        Candidate.full_name_vn == name_vn,
+                        Candidate.date_of_birth == cand_data.get("date_of_birth", "")
+                    ).first()
+
+                if existing:
+                    # ── UPDATE: cập nhật các trường candidate
+                    changed = False
+                    valid_cols = set(Candidate.__table__.columns.keys()) - {"id", "created_at"}
+                    for k, v in cand_data.items():
+                        if k in valid_cols:
+                            old_val = _str(getattr(existing, k, ""))
+                            new_val = _str(v)
+                            if old_val != new_val and new_val:
+                                setattr(existing, k, v)
+                                changed = True
+
+                    # ── UPDATE: giấy tờ (CCCD, Passport)
+                    for doc_key, doc_type in [("cccd", "CCCD"), ("passport", "Passport")]:
+                        doc_data = d[doc_key]
+                        if doc_data.get("document_number"):
+                            existing_doc = next(
+                                (x for x in existing.identity_documents if x.document_type == doc_type),
+                                None
+                            )
+                            if existing_doc:
+                                for k, v in doc_data.items():
+                                    if k not in ("document_type",) and _str(v):
+                                        if _str(getattr(existing_doc, k, "")) != _str(v):
+                                            setattr(existing_doc, k, v)
+                                            changed = True
+                            else:
+                                db.add(IdentityDocument(candidate_id=existing.id, **doc_data))
+                                changed = True
+
+                    # ── UPDATE: học vấn (xóa cũ, thêm mới từ Excel)
+                    new_edus = [e for e in d["educations"] if e.get("school_name_vn")]
+                    if new_edus:
+                        old_edu_names = sorted([_str(e.school_name_vn) for e in existing.educations])
+                        new_edu_names = sorted([_str(e.get("school_name_vn", "")) for e in new_edus])
+                        if old_edu_names != new_edu_names:
+                            for e in list(existing.educations):
+                                db.delete(e)
+                            db.flush()
+                            for edu in new_edus:
+                                valid = {k: v for k, v in edu.items()
+                                         if k in Education.__table__.columns.keys() and k != "id"}
+                                db.add(Education(candidate_id=existing.id, **valid))
+                            changed = True
+
+                    # ── UPDATE: công việc (xóa cũ, thêm mới từ Excel)
+                    new_works = [w for w in d["works"] if w.get("company_name_vn")]
+                    if new_works:
+                        old_work_names = sorted([_str(w.company_name_vn) for w in existing.work_experiences])
+                        new_work_names = sorted([_str(w.get("company_name_vn", "")) for w in new_works])
+                        if old_work_names != new_work_names:
+                            for w in list(existing.work_experiences):
+                                db.delete(w)
+                            db.flush()
+                            for w in new_works:
+                                valid = {k: v for k, v in w.items()
+                                         if k in WorkExperience.__table__.columns.keys() and k != "id"}
+                                db.add(WorkExperience(candidate_id=existing.id, **valid))
+                            changed = True
+
+                    # ── UPDATE: organizations & assignment
+                    def _update_or_create_org(org_data: dict, org_type: str):
+                        name = org_data.get("name_vn", "").strip()
+                        if not name:
+                            return None
+                        org = db.query(Organization).filter(
+                            Organization.name_vn == name,
+                            Organization.type == org_type
+                        ).first()
+                        if org:
+                            for k, v in org_data.items():
+                                if k in Organization.__table__.columns.keys() and k not in ("id", "type"):
+                                    if _str(v) and _str(getattr(org, k, "")) != _str(v):
+                                        setattr(org, k, v)
+                            return org
+                        else:
+                            org = Organization(type=org_type, **{
+                                k: v for k, v in org_data.items()
+                                if k in Organization.__table__.columns.keys() and k not in ("id", "type")
+                            })
+                            db.add(org)
+                            db.flush()
+                            return org
+
+                    sup = _update_or_create_org(d["supervising_org"], "supervising")
+                    acc = _update_or_create_org(d["accepting_org"], "accepting")
+                    send_org = None
+                    if d["sending_org"].get("name_vn"):
+                        send_org = _update_or_create_org(d["sending_org"], "sending")
+
+                    if existing.assignment:
+                        asgn = existing.assignment
+                        new_sup_id = sup.id if sup else None
+                        new_acc_id = acc.id if acc else None
+                        new_snd_id = send_org.id if send_org else None
+                        if (asgn.supervising_org_id != new_sup_id or
+                                asgn.accepting_org_id != new_acc_id or
+                                asgn.sending_org_id != new_snd_id):
+                            asgn.supervising_org_id = new_sup_id
+                            asgn.accepting_org_id = new_acc_id
+                            asgn.sending_org_id = new_snd_id
+                            changed = True
+                        int_field_vn = d.get("internship_field_vn", "")
+                        int_field_jp = d.get("internship_field_jp", "")
+                        if int_field_vn and _str(asgn.internship_field_vn) != _str(int_field_vn):
+                            asgn.internship_field_vn = int_field_vn
+                            changed = True
+                        if int_field_jp and _str(asgn.internship_field_jp) != _str(int_field_jp):
+                            asgn.internship_field_jp = int_field_jp
+                            changed = True
+                    elif sup or acc or send_org:
+                        db.add(CandidateAssignment(
+                            candidate_id=existing.id,
+                            supervising_org_id=sup.id if sup else None,
+                            accepting_org_id=acc.id if acc else None,
+                            sending_org_id=send_org.id if send_org else None,
+                            internship_field_vn=d.get("internship_field_vn", ""),
+                            internship_field_jp=d.get("internship_field_jp", ""),
+                        ))
+                        changed = True
+
+                    if changed:
+                        updated += 1
+                    else:
+                        unchanged += 1
+
+                else:
+                    # ── INSERT: tạo mới (giống logic import cũ)
+                    valid_cols = set(Candidate.__table__.columns.keys()) - {"id", "created_at"}
+                    c = Candidate(**{k: v for k, v in cand_data.items() if k in valid_cols})
+                    db.add(c)
+                    db.flush()
+
+                    # CCCD
+                    cccd = d["cccd"]
+                    if cccd.get("document_number"):
+                        db.add(IdentityDocument(candidate_id=c.id, **cccd))
+
+                    # Passport
+                    psp = d["passport"]
+                    if psp.get("document_number"):
+                        db.add(IdentityDocument(candidate_id=c.id, **psp))
+
+                    # Học vấn
+                    for edu in d["educations"]:
+                        if edu.get("school_name_vn"):
+                            valid = {k: v for k, v in edu.items()
+                                     if k in Education.__table__.columns.keys() and k != "id"}
+                            db.add(Education(candidate_id=c.id, **valid))
+
+                    # Công việc
+                    for w in d["works"]:
+                        if w.get("company_name_vn"):
+                            valid = {k: v for k, v in w.items()
+                                     if k in WorkExperience.__table__.columns.keys() and k != "id"}
+                            db.add(WorkExperience(candidate_id=c.id, **valid))
+
+                    # Organizations & Assignment
+                    def _get_or_create_org_reload(org_data: dict, org_type: str):
+                        name = org_data.get("name_vn", "").strip()
+                        if not name:
+                            return None
+                        org = db.query(Organization).filter(
+                            Organization.name_vn == name,
+                            Organization.type == org_type
+                        ).first()
+                        if not org:
+                            org = Organization(type=org_type, **{
+                                k: v for k, v in org_data.items()
+                                if k in Organization.__table__.columns.keys() and k not in ("id", "type")
+                            })
+                            db.add(org)
+                            db.flush()
+                        return org
+
+                    sup = _get_or_create_org_reload(d["supervising_org"], "supervising")
+                    acc = _get_or_create_org_reload(d["accepting_org"], "accepting")
+                    send_org = None
+                    if d["sending_org"].get("name_vn"):
+                        send_org = _get_or_create_org_reload(d["sending_org"], "sending")
+
+                    db.add(CandidateAssignment(
+                        candidate_id=c.id,
+                        supervising_org_id=sup.id if sup else None,
+                        accepting_org_id=acc.id if acc else None,
+                        sending_org_id=send_org.id if send_org else None,
+                        internship_field_vn=d.get("internship_field_vn", ""),
+                        internship_field_jp=d.get("internship_field_jp", ""),
+                    ))
+                    created += 1
+
+            except Exception as e:
+                errors.append({"row": row_idx, "error": str(e)})
+
+        # ── SYNC DELETE: xóa hồ sơ trong SQLite mà không còn trong Excel
+        sync_delete = data.get("sync_delete", True)  # mặc định bật
+        if sync_delete and total_rows > 0:
+            all_candidates = db.query(Candidate).all()
+            for cand in all_candidates:
+                pc = _str(cand.profile_code).strip()
+                nm = _str(cand.full_name_vn).strip()
+                dob = _str(cand.date_of_birth).strip()
+                # Kiểm tra xem candidate này có trong Excel không
+                in_excel = (pc and pc in excel_profile_codes) or ((nm, dob) in excel_names_dob)
+                if not in_excel:
+                    db.delete(cand)
+                    deleted += 1
+
+        db.commit()
+        return jsonify({
+            "ok": True,
+            "total_excel_rows": total_rows,
+            "created": created,
+            "updated": updated,
+            "unchanged": unchanged,
+            "deleted": deleted,
+            "errors": errors,
+            "backup": os.path.basename(backup_path) if backup_path else None,
+        })
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()
+
+
+# ─────────────────────────────────────────────────────────────
+# OPEN: Mở file Excel bằng ứng dụng mặc định
+# ─────────────────────────────────────────────────────────────
+
+@excel_io_bp.route("/excel/open", methods=["GET"])
+def open_excel_file():
+    """Mở file Excel bằng ứng dụng mặc định (Windows: Excel / LibreOffice)."""
+    db = get_session()
+    try:
+        path = _get_excel_path(db)
+        if not os.path.isfile(path):
+            return jsonify({"error": f"File không tồn tại: {path}"}), 404
+
+        # Mở file bằng ứng dụng mặc định (Windows)
+        import subprocess
+        import sys
+        if sys.platform == "win32":
+            os.startfile(path)
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", path])
+        else:
+            subprocess.Popen(["xdg-open", path])
+
+        return jsonify({"ok": True, "path": path})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()

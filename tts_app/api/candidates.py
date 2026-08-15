@@ -296,7 +296,19 @@ def create_candidate():
     db = get_session()
     try:
         data = request.get_json() or {}
-        c_data = data.get("candidate", {})
+        
+        # Sanitize empty strings to None for SQLAlchemy
+        def _sanitize(d):
+            if isinstance(d, dict):
+                return {k: (None if v == "" else v) for k, v in d.items()}
+            return d
+
+        # Skip child records where all meaningful fields are empty
+        def _is_empty(d):
+            skip = {'id', 'candidate_id'}
+            return all(v is None for k, v in d.items() if k not in skip)
+
+        c_data = _sanitize(data.get("candidate", {}))
         
         count = db.query(Candidate).count()
         if not c_data.get("profile_code"):
@@ -305,27 +317,40 @@ def create_candidate():
         if "custom_fields" in c_data and isinstance(c_data["custom_fields"], dict):
             c_data["custom_fields"] = json.dumps(c_data["custom_fields"])
             
-        c = Candidate(**{k: v for k, v in c_data.items() if k in Candidate.__table__.columns.keys()})
+        valid_cols = set(Candidate.__table__.columns.keys()) - {"id", "created_at", "updated_at"}
+        c = Candidate(**{k: v for k, v in c_data.items() if k in valid_cols})
         db.add(c)
         db.flush()
 
         for doc in data.get("identityDocuments", []):
-            db.add(IdentityDocument(**{k: v for k, v in doc.items() if k in IdentityDocument.__table__.columns.keys() and k != 'id'}, candidate_id=c.id))
+            doc = _sanitize(doc)
+            if not _is_empty(doc):
+                db.add(IdentityDocument(**{k: v for k, v in doc.items() if k in IdentityDocument.__table__.columns.keys() and k not in ('id', 'candidate_id')}, candidate_id=c.id))
         
         for edu in data.get("educations", []):
-            db.add(Education(**{k: v for k, v in edu.items() if k in Education.__table__.columns.keys() and k != 'id'}, candidate_id=c.id))
+            edu = _sanitize(edu)
+            if not _is_empty(edu):
+                db.add(Education(**{k: v for k, v in edu.items() if k in Education.__table__.columns.keys() and k not in ('id', 'candidate_id')}, candidate_id=c.id))
 
         for work in data.get("workExperiences", []):
-            db.add(WorkExperience(**{k: v for k, v in work.items() if k in WorkExperience.__table__.columns.keys() and k != 'id'}, candidate_id=c.id))
+            work = _sanitize(work)
+            if not _is_empty(work):
+                db.add(WorkExperience(**{k: v for k, v in work.items() if k in WorkExperience.__table__.columns.keys() and k not in ('id', 'candidate_id')}, candidate_id=c.id))
             
         for skill in data.get("skillExperiences", []):
-            db.add(SkillExperience(**{k: v for k, v in skill.items() if k in SkillExperience.__table__.columns.keys() and k != 'id'}, candidate_id=c.id))
+            skill = _sanitize(skill)
+            if not _is_empty(skill):
+                db.add(SkillExperience(**{k: v for k, v in skill.items() if k in SkillExperience.__table__.columns.keys() and k not in ('id', 'candidate_id')}, candidate_id=c.id))
             
         for jpe in data.get("japanExperiences", []):
-            db.add(JapanExperience(**{k: v for k, v in jpe.items() if k in JapanExperience.__table__.columns.keys() and k != 'id'}, candidate_id=c.id))
+            jpe = _sanitize(jpe)
+            if not _is_empty(jpe):
+                db.add(JapanExperience(**{k: v for k, v in jpe.items() if k in JapanExperience.__table__.columns.keys() and k not in ('id', 'candidate_id')}, candidate_id=c.id))
             
         for fam in data.get("familyMembers", []):
-            db.add(FamilyMember(**{k: v for k, v in fam.items() if k in FamilyMember.__table__.columns.keys() and k != 'id'}, candidate_id=c.id))
+            fam = _sanitize(fam)
+            if not _is_empty(fam):
+                db.add(FamilyMember(**{k: v for k, v in fam.items() if k in FamilyMember.__table__.columns.keys() and k not in ('id', 'candidate_id')}, candidate_id=c.id))
 
         db.commit()
         db.refresh(c)
@@ -347,9 +372,19 @@ def update_candidate(cid):
             return jsonify({"error": "Not found"}), 404
             
         data = request.get_json() or {}
-        c_data = data.get("candidate", {})
         
-        valid_cols = set(Candidate.__table__.columns.keys()) - {"id", "created_at"}
+        def _sanitize(d):
+            if isinstance(d, dict):
+                return {k: (None if v == "" else v) for k, v in d.items()}
+            return d
+
+        def _is_empty(d):
+            skip = {'id', 'candidate_id'}
+            return all(v is None for k, v in d.items() if k not in skip)
+
+        c_data = _sanitize(data.get("candidate", {}))
+        
+        valid_cols = set(Candidate.__table__.columns.keys()) - {"id", "created_at", "updated_at"}
         
         if "custom_fields" in c_data and isinstance(c_data["custom_fields"], dict):
             c_data["custom_fields"] = json.dumps(c_data["custom_fields"])
@@ -368,17 +403,29 @@ def update_candidate(cid):
         db.flush()
         
         for doc in data.get("identityDocuments", []):
-            db.add(IdentityDocument(**{k: v for k, v in doc.items() if k in IdentityDocument.__table__.columns.keys() and k != 'id'}, candidate_id=c.id))
+            doc = _sanitize(doc)
+            if not _is_empty(doc):
+                db.add(IdentityDocument(**{k: v for k, v in doc.items() if k in IdentityDocument.__table__.columns.keys() and k not in ('id', 'candidate_id')}, candidate_id=c.id))
         for edu in data.get("educations", []):
-            db.add(Education(**{k: v for k, v in edu.items() if k in Education.__table__.columns.keys() and k != 'id'}, candidate_id=c.id))
+            edu = _sanitize(edu)
+            if not _is_empty(edu):
+                db.add(Education(**{k: v for k, v in edu.items() if k in Education.__table__.columns.keys() and k not in ('id', 'candidate_id')}, candidate_id=c.id))
         for work in data.get("workExperiences", []):
-            db.add(WorkExperience(**{k: v for k, v in work.items() if k in WorkExperience.__table__.columns.keys() and k != 'id'}, candidate_id=c.id))
+            work = _sanitize(work)
+            if not _is_empty(work):
+                db.add(WorkExperience(**{k: v for k, v in work.items() if k in WorkExperience.__table__.columns.keys() and k not in ('id', 'candidate_id')}, candidate_id=c.id))
         for skill in data.get("skillExperiences", []):
-            db.add(SkillExperience(**{k: v for k, v in skill.items() if k in SkillExperience.__table__.columns.keys() and k != 'id'}, candidate_id=c.id))
+            skill = _sanitize(skill)
+            if not _is_empty(skill):
+                db.add(SkillExperience(**{k: v for k, v in skill.items() if k in SkillExperience.__table__.columns.keys() and k not in ('id', 'candidate_id')}, candidate_id=c.id))
         for jpe in data.get("japanExperiences", []):
-            db.add(JapanExperience(**{k: v for k, v in jpe.items() if k in JapanExperience.__table__.columns.keys() and k != 'id'}, candidate_id=c.id))
+            jpe = _sanitize(jpe)
+            if not _is_empty(jpe):
+                db.add(JapanExperience(**{k: v for k, v in jpe.items() if k in JapanExperience.__table__.columns.keys() and k not in ('id', 'candidate_id')}, candidate_id=c.id))
         for fam in data.get("familyMembers", []):
-            db.add(FamilyMember(**{k: v for k, v in fam.items() if k in FamilyMember.__table__.columns.keys() and k != 'id'}, candidate_id=c.id))
+            fam = _sanitize(fam)
+            if not _is_empty(fam):
+                db.add(FamilyMember(**{k: v for k, v in fam.items() if k in FamilyMember.__table__.columns.keys() and k not in ('id', 'candidate_id')}, candidate_id=c.id))
 
         db.commit()
         db.refresh(c)

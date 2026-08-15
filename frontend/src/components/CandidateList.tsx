@@ -72,7 +72,7 @@ export function CandidateList({
 
   const handleBatchDelete = async () => {
     if (selectedIds.length === 0) return;
-    if (!confirm(`Bạn có chắc chắn muốn xóa ${selectedIds.length} hồ sơ đã chọn khỏi hệ thống?`)) return;
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa ${selectedIds.length} hồ sơ đã chọn khỏi hệ thống?`)) return;
 
     try {
       const res = await fetch('/api/candidates/batch-delete', {
@@ -83,11 +83,9 @@ export function CandidateList({
       if (res.ok) {
         selectedIds.forEach(id => onDeleteCandidate(id));
         setSelectedIds([]);
-      } else {
-        alert('Có lỗi khi xóa hàng loạt.');
       }
     } catch {
-      alert('Không thể kết nối đến server backend.');
+      // Error handled silently
     }
   };
 
@@ -234,9 +232,7 @@ export function CandidateList({
                       title="Xóa hồ sơ"
                       onClick={e => {
                         e.stopPropagation();
-                        if (confirm(`Bạn có chắc chắn muốn xóa hồ sơ ${c.full_name_vn || c.profile_code}?`)) {
-                          onDeleteCandidate(c.id);
-                        }
+                        onDeleteCandidate(c.id);
                       }}
                       className="p-1.5 border border-[#D32F2F] bg-[#FFF5F5] hover:bg-[#D32F2F] hover:text-white rounded text-[#D32F2F] transition-colors"
                     >

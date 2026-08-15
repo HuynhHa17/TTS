@@ -1,4 +1,4 @@
-﻿@echo off
+@echo off
 chcp 65001 >nul
 title TTS Master Dashboard Launcher
 
@@ -16,6 +16,12 @@ set "NPM_CMD=npm"
 if exist "%USERPROFILE%\runtimes\node\npm.cmd" (
     set "NPM_CMD=%USERPROFILE%\runtimes\node\npm.cmd"
     set "PATH=%USERPROFILE%\runtimes\node;!PATH!"
+) else if exist "%ProgramFiles%\nodejs\npm.cmd" (
+    set "NPM_CMD=%ProgramFiles%\nodejs\npm.cmd"
+    set "PATH=%ProgramFiles%\nodejs;!PATH!"
+) else if exist "%ProgramFiles(x86)%\nodejs\npm.cmd" (
+    set "NPM_CMD=%ProgramFiles(x86)%\nodejs\npm.cmd"
+    set "PATH=%ProgramFiles(x86)%\nodejs;!PATH!"
 )
 
 echo.
