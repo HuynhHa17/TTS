@@ -9,7 +9,38 @@ from openpyxl.utils import get_column_letter
 from datetime import datetime
 import re
 
-from core.models import COL60_HEADERS, Candidate
+from core.models import Candidate
+
+# 60-column headers for the master export sheet
+COL60_HEADERS = [
+    "STT", "MA HO SO", "TEN VNM", "TEN ENG", "TEN PHIEN AM", "GIOI TINH JPN",
+    "SO CAN CUOC", "NGAY CAP CAN CUOC VNM", "NGAY CAP CAN CUOC JPN",
+    "NOI CAP CAN CUOC VNM", "NOI CAP CAN CUOC JPN",
+    "SO HO CHIEU", "NGAY CAP HO CHIEU VNM", "NGAY CAP HO CHIEU JPN",
+    "NOI CAP HO CHIEU VNM", "NOI CAP HO CHIEU JPN",
+    "NAM SINH VNM", "NAM SINH JPN",
+    "TINH TRANG HON NHAN", "CO CON",
+    "DIA CHI VNM", "DIA CHI JPN", "NOI SINH VNM", "NOI SINH JPN",
+    "NGUOI GIAM HO VNM", "NGUOI GIAM HO JPN",
+    "DIA CHI NGUOI GIAM HO VNM", "DIA CHI NGUOI GIAM HO JPN",
+    "SDT NGUOI GIAM HO",
+    "TRUONG HOC 1 VNM", "TRUONG HOC 1 JPN",
+    "TRUONG HOC 2 VNM", "TRUONG HOC 2 JPN",
+    "TRUONG HOC 3 VNM", "TRUONG HOC 3 JPN",
+    "CONG TY 1 VNM", "CONG TY 1 JPN",
+    "CONG TY 2 VNM", "CONG TY 2 JPN",
+    "CONG TY 3 VNM", "CONG TY 3 JPN",
+    "LINH VUC THUC TAP VNM", "LINH VUC THUC TAP JPN",
+    "TOM TAT KN JPN", "TOM TAT KN VNM",
+    "NGHIEP DOAN VNM", "NGHIEP DOAN JPN",
+    "DC NGHIEP DOAN VNM", "DC NGHIEP DOAN JPN",
+    "ND NGHIEP DOAN VNM", "ND NGHIEP DOAN JPN",
+    "CONG TY TIEP NHAN VNM", "CONG TY TIEP NHAN JPN",
+    "DC CONG TY TIEP NHAN VNM", "DC CONG TY TIEP NHAN JPN",
+    "ND CONG TY TIEP NHAN VNM", "ND CONG TY TIEP NHAN JPN",
+    "CONG TY PHAI CU VNM", "ND CONG TY PHAI CU VNM",
+    "SO DIEN THOAI",
+]
 
 
 # ── Style helpers ─────────────────────────────────────────────────────────────

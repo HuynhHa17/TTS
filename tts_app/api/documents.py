@@ -2,11 +2,14 @@ import os
 import io
 import uuid
 import zipfile
+from io import BytesIO
 from flask import Blueprint, jsonify, send_file, request
 
 from core.database import get_session
 from core.models import Candidate
 from core.template_filler import fill_rirekisho_excel
+from core.pdf_exporter import build_rirekisho_pdf
+from api.candidates import _build_full_profile
 import config
 
 documents_bp = Blueprint("documents", __name__)
@@ -52,8 +55,35 @@ def export_rirekisho(candidate_id):
 
 @documents_bp.route("/documents/tcmmxd/<int:candidate_id>", methods=["GET"])
 def export_tcmmxd(candidate_id):
-    # Currently uses the primary template filler for TCMMXD
-    return export_rirekisho(candidate_id)
+    """Xuất hồ sơ TCMMXD dạng PDF (履歴書 Rirekisho format)."""
+    db = get_session()
+    try:
+        c = db.query(Candidate).filter(Candidate.id == candidate_id).first()
+        if not c:
+            return jsonify({"error": "Candidate not found"}), 404
+        profile = _build_full_profile(c)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()
+
+    try:
+        pdf_bytes = build_rirekisho_pdf(profile)
+    except Exception as e:
+        return jsonify({"error": f"PDF generation failed: {e}"}), 500
+
+    cand = profile.get("candidate", {})
+    name = (cand.get("full_name_eng") or cand.get("full_name_vn") or f"candidate_{candidate_id}").upper().replace(" ", "_")
+    code = cand.get("profile_code") or str(candidate_id)
+    stt = code.split("-")[-1] if "-" in str(code) else str(code)
+    filename = f"{stt}. {name.replace('_', ' ')} - TCMMXD.pdf"
+
+    return send_file(
+        BytesIO(pdf_bytes),
+        as_attachment=True,
+        download_name=filename,
+        mimetype="application/pdf",
+    )
 
 
 @documents_bp.route("/documents/khai-tt", methods=["GET"])

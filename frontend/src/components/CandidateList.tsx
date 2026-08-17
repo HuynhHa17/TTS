@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { Candidate } from '../types';
-import { ChevronLeft, ChevronRight, Trash2, Plus, FileDown, CheckSquare, Square } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Trash2, Plus, FileDown, CheckSquare, Square, FileArchive } from 'lucide-react';
 import { formatDateVN } from '../utils/dateFormat';
 
 interface CandidateListProps {
@@ -13,6 +13,7 @@ interface CandidateListProps {
   onDeleteCandidate: (id: number) => void;
   onDownloadRirekisho: (id: number) => void;
   onDownloadTcmmxd: (id: number) => void;
+  onExportAllPdf?: () => void;
   isLoading: boolean;
 }
 
@@ -27,6 +28,7 @@ export function CandidateList({
   onDeleteCandidate,
   onDownloadRirekisho,
   onDownloadTcmmxd,
+  onExportAllPdf,
   isLoading
 }: CandidateListProps) {
   const [currentPage, setCurrentPage] = useState(1);
@@ -120,6 +122,18 @@ export function CandidateList({
                 shadow-[2px_2px_0_0_#D32F2F] hover:shadow-[3px_3px_0_0_#D32F2F] active:scale-95"
             >
               <Trash2 size={15} /> Xóa ({selectedIds.length}) Đã Chọn
+            </button>
+          )}
+
+          {onExportAllPdf && (
+            <button
+              onClick={onExportAllPdf}
+              title="Xuất tất cả hồ sơ ra PDF (ZIP)"
+              className="border-2 border-[#1E3A5F] bg-[#F0F4FA] text-[#1E3A5F] px-3 py-2 text-xs font-black uppercase rounded
+                flex items-center gap-1.5 hover:bg-[#1E3A5F] hover:text-white transition-all
+                shadow-[2px_2px_0_0_#1E3A5F] hover:shadow-[3px_3px_0_0_#1E3A5F] active:scale-95"
+            >
+              <FileArchive size={15} /> Xuất tất cả PDF
             </button>
           )}
 

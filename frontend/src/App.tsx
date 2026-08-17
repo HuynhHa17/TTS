@@ -252,6 +252,30 @@ export default function App() {
     window.open(`/api/documents/tcmmxd/${candidateId}`, '_blank');
   };
 
+  const handleExportAllPdf = async () => {
+    showToast('info', 'Đang tạo PDF...', 'Đang xuất tất cả hồ sơ ra PDF, vui lòng chờ...');
+    try {
+      const res = await fetch('/api/export/pdf/all');
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `TTS_HoSo_PDF_${new Date().toISOString().split('T')[0]}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+        showToast('success', 'Xuất PDF hoàn tất', 'Đã tải xuống file ZIP chứa tất cả hồ sơ PDF.');
+      } else {
+        showToast('error', 'Lỗi xuất PDF', 'Có lỗi xảy ra khi xuất PDF.');
+      }
+    } catch (e) {
+      console.error(e);
+      showToast('error', 'Lỗi kết nối', 'Không thể kết nối đến server backend.');
+    }
+  };
+
   const handleDownloadKhaiTtMaster = () => {
     window.open('/api/documents/khai-tt', '_blank');
   };
@@ -377,6 +401,7 @@ export default function App() {
             onDeleteCandidate={handleDeleteCandidate}
             onDownloadRirekisho={handleDownloadRirekisho}
             onDownloadTcmmxd={handleDownloadTcmmxd}
+            onExportAllPdf={handleExportAllPdf}
             isLoading={isLoading}
           />
         )}
