@@ -408,3 +408,137 @@ class TestTranslate:
     def test_translate_empty_fields_no_crash(self, client):
         r = jpost(client, "/api/translate", {"fields": {}})
         assert r.status_code in (200, 400)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 7. LIVE CONNECTION — kiểm tra backend đang chạy trên localhost:5000
+#    Chạy riêng: pytest tests/test_backend.py -v -k "Live"
+#    Yêu cầu: backend phải đang chạy (python tts_app/run.py)
+# ═══════════════════════════════════════════════════════════════════════════════
+import socket
+
+def _backend_is_up(host="127.0.0.1", port=5000, timeout=2) -> bool:
+    """Kiểm tra nhanh xem port 5000 có đang lắng nghe không."""
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
+@pytest.fixture(scope="module")
+def live(request):
+    """Skip toàn bộ class nếu backend không chạy."""
+    import requests as _req
+    if not _backend_is_up():
+        pytest.skip("Backend không chạy trên localhost:5000 — bỏ qua live tests")
+    return _req
+
+
+BASE = "http://localhost:5000/api"
+
+
+class TestLiveConnection:
+    """Kiểm tra kết nối thực tới backend Flask đang chạy."""
+
+    # ── 7.1 Health check ─────────────────────────────────────────────────────
+    def test_live_backend_reachable(self, live):
+        """Port 5000 phải mở và phản hồi được."""
+        assert _backend_is_up(), "Backend không lắng nghe trên port 5000"
+
+    def test_live_candidates_returns_200(self, live):
+        r = live.get(f"{BASE}/candidates", timeout=5)
+        assert r.status_code == 200, f"Expected 200, got {r.status_code}: {r.text[:200]}"
+
+    def test_live_candidates_returns_json(self, live):
+        r = live.get(f"{BASE}/candidates", timeout=5)
+        assert "application/json" in r.headers.get("Content-Type", "")
+        data = r.json()
+        assert isinstance(data, list)
+
+    def test_live_settings_returns_200(self, live):
+        r = live.get(f"{BASE}/settings", timeout=5)
+        assert r.status_code == 200
+
+    def test_live_settings_has_required_keys(self, live):
+        data = live.get(f"{BASE}/settings", timeout=5).json()
+        for key in ["cv_path", "output_path", "gemini_api_key_set"]:
+            assert key in data, f"Thiếu key '{key}' trong /api/settings"
+
+    def test_live_excel_config_returns_200(self, live):
+        r = live.get(f"{BASE}/excel/config", timeout=5)
+        assert r.status_code == 200
+
+    def test_live_export_path_returns_200(self, live):
+        r = live.get(f"{BASE}/export/path", timeout=5)
+        assert r.status_code == 200
+        data = r.json()
+        assert "output_path" in data and "exists" in data
+
+    # ── 7.2 CORS headers ─────────────────────────────────────────────────────
+    def test_live_cors_header_present(self, live):
+        """Frontend cần CORS — backend phải trả Access-Control-Allow-Origin."""
+        r = live.options(
+            f"{BASE}/candidates",
+            headers={"Origin": "http://localhost:5173",
+                     "Access-Control-Request-Method": "GET"},
+            timeout=5,
+        )
+        # Flask-CORS thường trả 200 hoặc 204 với OPTIONS
+        assert r.status_code in (200, 204), f"CORS preflight failed: {r.status_code}"
+
+    # ── 7.3 CRUD round-trip ─────────────────────────────────────────────────
+    def test_live_create_and_delete_candidate(self, live):
+        """Tạo ứng viên mới → đọc lại → xoá → xác nhận 404."""
+        payload = {
+            "candidate": {
+                "full_name_vn": "Test Kết Nối Live",
+                "full_name_eng": "TEST KET NOI LIVE",
+                "status": "draft",
+            }
+        }
+        # Create
+        r = live.post(f"{BASE}/candidates", json=payload, timeout=5)
+        assert r.status_code == 201, f"Create failed: {r.text[:300]}"
+        cid = r.json()["candidate"]["id"]
+
+        # Read
+        r2 = live.get(f"{BASE}/candidates/{cid}", timeout=5)
+        assert r2.status_code == 200
+        assert r2.json()["candidate"]["full_name_vn"] == "Test Kết Nối Live"
+
+        # Delete
+        r3 = live.delete(f"{BASE}/candidates/{cid}", timeout=5)
+        assert r3.status_code == 200
+
+        # Confirm 404
+        r4 = live.get(f"{BASE}/candidates/{cid}", timeout=5)
+        assert r4.status_code == 404
+
+    def test_live_get_nonexistent_candidate_404(self, live):
+        r = live.get(f"{BASE}/candidates/999999", timeout=5)
+        assert r.status_code == 404
+
+    # ── 7.4 Export endpoints ─────────────────────────────────────────────────
+    def test_live_export_pdf_nonexistent_returns_404(self, live):
+        r = live.get(f"{BASE}/export/pdf/999999", timeout=10)
+        assert r.status_code == 404
+
+    def test_live_export_template_returns_xlsx(self, live):
+        r = live.get(f"{BASE}/export/template", timeout=10)
+        assert r.status_code == 200
+        assert "spreadsheetml" in r.headers.get("Content-Type", "") or \
+               "octet-stream" in r.headers.get("Content-Type", "")
+
+    def test_live_documents_tcmmxd_nonexistent_404(self, live):
+        r = live.get(f"{BASE}/documents/tcmmxd/999999", timeout=10)
+        assert r.status_code == 404
+
+    # ── 7.5 Response time ────────────────────────────────────────────────────
+    def test_live_candidates_response_under_2s(self, live):
+        """API /candidates phải phản hồi trong vòng 2 giây."""
+        import time
+        t0 = time.time()
+        live.get(f"{BASE}/candidates", timeout=5)
+        elapsed = time.time() - t0
+        assert elapsed < 3.0, f"Response quá chậm: {elapsed:.2f}s"

@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { Candidate } from '../types';
-import { ChevronLeft, ChevronRight, Trash2, Plus, FileDown, CheckSquare, Square, FileArchive } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, Trash2, Plus, FileDown, CheckSquare, Square, FileArchive, Edit, FileText, FileSpreadsheet } from 'lucide-react';
 import { formatDateVN } from '../utils/dateFormat';
 
 interface CandidateListProps {
@@ -9,7 +9,7 @@ interface CandidateListProps {
   setSelectedIds: React.Dispatch<React.SetStateAction<number[]>>;
   onSelectCandidate: (id: number) => void;
   onAddNew: () => void;
-  onOpenGoogleSheetImport: () => void;
+  onOpenImportForm?: () => void;
   onDeleteCandidate: (id: number) => void;
   onDownloadRirekisho: (id: number) => void;
   onDownloadTcmmxd: (id: number) => void;
@@ -25,6 +25,7 @@ export function CandidateList({
   setSelectedIds,
   onSelectCandidate,
   onAddNew,
+  onOpenImportForm,
   onDeleteCandidate,
   onDownloadRirekisho,
   onDownloadTcmmxd,
@@ -33,6 +34,13 @@ export function CandidateList({
 }: CandidateListProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  // Auto-focus search input on mount
+  useEffect(() => {
+    const timer = setTimeout(() => searchRef.current?.focus(), 100);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Reset to page 1 if candidates list changes
   useEffect(() => {
@@ -92,36 +100,59 @@ export function CandidateList({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Top Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-lg border-2 border-[#1A1A1A] shadow-[3px_3px_0_0_#1A1A1A]">
-        <div className="flex items-center gap-3 flex-1 min-w-[280px]">
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white border-2 border-[#1A1A1A] shadow-[2px_2px_0_0_#1A1A1A] rounded-xl px-4 py-3">
+        <div className="flex items-center gap-2.5 flex-1 min-w-[280px]">
           <button
             onClick={handleToggleSelectAll}
-            className="flex items-center gap-1.5 text-xs font-extrabold uppercase px-3 py-2 border-2 border-[#1A1A1A] rounded bg-[#FAFAF5] hover:bg-[#FFD700] transition-colors"
+            className={`h-9 px-3 text-xs font-black rounded-lg flex items-center gap-1.5 border-2 border-[#1A1A1A] shadow-[2px_2px_0_0_#1A1A1A] transition-all ${
+              isAllSelected 
+                ? 'bg-[#1A1A1A] text-[#FFD700]' 
+                : 'bg-white text-[#1A1A1A] hover:bg-[#FFD700]'
+            }`}
           >
-            {isAllSelected ? <CheckSquare size={16} /> : <Square size={16} />}
-            {isAllSelected ? 'Bỏ chọn trang' : 'Chọn cả trang'}
+            {isAllSelected ? <CheckSquare size={15} /> : <Square size={15} />}
+            <span>{isAllSelected ? 'Bỏ chọn trang' : 'Chọn cả trang'}</span>
           </button>
 
-          <input
-            type="text"
-            placeholder="Tìm theo tên, mã HS, Katakana, SĐT..."
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            className="artistic-input py-1.5 px-3 text-sm flex-1 max-w-sm"
-          />
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#999]" size={16} />
+            <input
+              ref={searchRef}
+              type="text"
+              placeholder="Tìm theo tên, mã HS, Katakana, SĐT..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="artistic-input w-full py-2 pl-9 pr-4 text-sm font-medium"
+            />
+          </div>
+
+          {filteredCandidates.length !== candidates.length && (
+            <span className="text-xs font-bold text-[#FF4D00] whitespace-nowrap">
+              {filteredCandidates.length} kết quả
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
           {selectedIds.length > 0 && (
             <button
               onClick={handleBatchDelete}
-              className="border-2 border-[#D32F2F] bg-[#FFF5F5] text-[#D32F2F] px-4 py-2 text-xs font-black uppercase rounded
-                flex items-center gap-1.5 hover:bg-[#D32F2F] hover:text-white transition-all
-                shadow-[2px_2px_0_0_#D32F2F] hover:shadow-[3px_3px_0_0_#D32F2F] active:scale-95"
+              className="h-9 px-3 text-xs font-black uppercase rounded-lg border-2 border-[#D32F2F] bg-[#FFF5F5] text-[#D32F2F] shadow-[2px_2px_0_0_#D32F2F] hover:bg-[#D32F2F] hover:text-white transition-all flex items-center gap-1.5 active:scale-95"
             >
-              <Trash2 size={15} /> Xóa ({selectedIds.length}) Đã Chọn
+              <Trash2 size={14} /> Xóa ({selectedIds.length})
+            </button>
+          )}
+
+          {onOpenImportForm && (
+            <button
+              onClick={onOpenImportForm}
+              title="Import file Excel đơn điền hoặc tải mẫu tờ đơn"
+              className="h-9 px-3 text-xs font-black rounded-lg border-2 border-[#1A1A1A] bg-[#FFD700] text-[#1A1A1A] shadow-[2px_2px_0_0_#1A1A1A] hover:shadow-[3px_3px_0_0_#1A1A1A] hover:bg-[#FFE033] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0_0_#1A1A1A] transition-all flex items-center gap-1.5"
+            >
+              <FileSpreadsheet size={14} />
+              <span>Import Đơn</span>
             </button>
           )}
 
@@ -129,19 +160,19 @@ export function CandidateList({
             <button
               onClick={onExportAllPdf}
               title="Xuất tất cả hồ sơ ra PDF (ZIP)"
-              className="border-2 border-[#1E3A5F] bg-[#F0F4FA] text-[#1E3A5F] px-3 py-2 text-xs font-black uppercase rounded
-                flex items-center gap-1.5 hover:bg-[#1E3A5F] hover:text-white transition-all
-                shadow-[2px_2px_0_0_#1E3A5F] hover:shadow-[3px_3px_0_0_#1E3A5F] active:scale-95"
+              className="h-9 px-3 text-xs font-black rounded-lg border-2 border-[#1A1A1A] bg-[#00E5FF] text-[#1A1A1A] shadow-[2px_2px_0_0_#1A1A1A] hover:shadow-[3px_3px_0_0_#1A1A1A] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0_0_#1A1A1A] transition-all flex items-center gap-1.5"
             >
-              <FileArchive size={15} /> Xuất tất cả PDF
+              <FileArchive size={14} />
+              <span>Xuất tất cả PDF</span>
             </button>
           )}
 
           <button
             onClick={onAddNew}
-            className="artistic-btn-primary px-4 py-2 text-xs font-black uppercase rounded flex items-center gap-1.5"
+            className="h-9 px-3.5 text-xs font-black rounded-lg border-2 border-[#1A1A1A] bg-[#FF4D00] text-white shadow-[2px_2px_0_0_#1A1A1A] hover:shadow-[3px_3px_0_0_#1A1A1A] hover:bg-[#E64500] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0_0_#1A1A1A] transition-all flex items-center gap-1.5"
           >
-            <Plus size={15} /> Thêm Hồ Sơ Mới
+            <Plus size={14} />
+            <span>Thêm Hồ Sơ</span>
           </button>
         </div>
       </div>
@@ -152,41 +183,41 @@ export function CandidateList({
           Không tìm thấy hồ sơ nào phù hợp.
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {paginatedCandidates.map(c => {
             const isSelected = selectedIds.includes(c.id);
             return (
               <div
                 key={c.id}
-                className={`artistic-card p-5 cursor-pointer transition-all relative ${
+                className={`artistic-card p-4 cursor-pointer transition-all relative ${
                   isSelected ? 'border-[#FF4D00] bg-[#FFF9F0] ring-2 ring-[#FF4D00]' : 'hover:bg-[#FFFDF9]'
                 }`}
                 onClick={() => onSelectCandidate(c.id)}
               >
                 {/* Header card with selection checkbox */}
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex items-start gap-3">
+                <div className="flex justify-between items-start mb-3">
+                  <div className="flex items-start gap-2.5">
                     <input
                       type="checkbox"
                       checked={isSelected}
                       onClick={e => handleToggleSelect(c.id, e)}
                       onChange={() => {}}
-                      className="w-5 h-5 mt-0.5 cursor-pointer accent-[#FF4D00] rounded"
+                      className="w-4 h-4 mt-0.5 cursor-pointer accent-[#FF4D00] rounded"
                     />
                     <div>
-                      <h3 className="font-extrabold text-lg uppercase tracking-tight text-[#1A1A1A]">
+                      <h3 className="font-extrabold text-base uppercase tracking-tight text-[#1A1A1A] leading-tight">
                         {c.full_name_vn || 'Chưa cập nhật tên'}
                       </h3>
-                      <p className="text-[#555] font-bold text-xs">{c.full_name_katakana || '---'}</p>
+                      <p className="text-[#666] font-bold text-xs mt-0.5">{c.full_name_katakana || '---'}</p>
                     </div>
                   </div>
-                  <span className="bg-[#FFD700] border-2 border-[#1A1A1A] font-mono text-xs font-black px-2 py-0.5 rounded shadow-[2px_2px_0_0_#1A1A1A]">
+                  <span className="bg-[#FFD700] border border-[#1A1A1A] font-mono text-[11px] font-black px-2 py-0.5 rounded shadow-[1.5px_1.5px_0_0_#1A1A1A]">
                     {c.profile_code || '---'}
                   </span>
                 </div>
 
                 {/* Body info */}
-                <div className="space-y-1.5 text-xs font-semibold text-[#333] bg-[#FAFAF5] p-3 rounded border border-[#1A1A1A]/15">
+                <div className="space-y-1 text-xs font-semibold text-[#333] bg-[#FAFAF5] p-2.5 rounded-lg border border-[#1A1A1A]/10">
                   <div className="flex justify-between">
                     <span className="text-[#666]">Ngày sinh:</span>
                     <span className="font-bold">{formatDateVN(c.date_of_birth) || '---'}</span>
@@ -202,44 +233,51 @@ export function CandidateList({
                 </div>
 
                 {/* Footer action buttons */}
-                <div className="mt-4 pt-3 border-t-2 border-[#1A1A1A]/10 flex justify-between items-center gap-2">
-                  <span className={`uppercase text-[10px] font-black px-2 py-0.5 rounded border border-[#1A1A1A]
-                    ${c.status === 'completed' ? 'bg-[#00C853] text-white' : c.status === 'reviewing' ? 'bg-[#FFD700]' : 'bg-[#E0E0E0]'}`}>
-                    {c.status || 'draft'}
+                <div className="mt-3 pt-2.5 border-t border-[#1A1A1A]/10 flex justify-between items-center gap-2">
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
+                    c.status === 'completed'
+                      ? 'bg-[#E8F5E9] text-[#1B8A3F] border-[#A5D6A7]'
+                      : c.status === 'reviewing'
+                        ? 'bg-[#FFF8E1] text-[#B8760A] border-[#FFE082]'
+                        : 'bg-[#F5F5F5] text-[#555] border-[#DDD]'
+                  }`}>
+                    {c.status === 'completed' ? '● Hoàn thành' : c.status === 'reviewing' ? '◐ Xét duyệt' : '○ Nháp'}
                   </span>
 
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1">
                     <button
                       type="button"
-                      title="Xuất Rirekisho"
+                      title="Xuất Rirekisho Excel"
                       onClick={e => {
                         e.stopPropagation();
                         onDownloadRirekisho(c.id);
                       }}
-                      className="p-1.5 border border-[#1A1A1A] bg-white hover:bg-[#FFD700] rounded text-[#1A1A1A] transition-colors"
+                      className="w-7 h-7 flex items-center justify-center border border-[#DDD] bg-white hover:bg-[#E8F5E9] hover:border-[#00C853] hover:text-[#1B8A3F] rounded-lg text-[#555] transition-all"
                     >
-                      <FileDown size={14} />
+                      <FileDown size={13} />
                     </button>
                     <button
                       type="button"
-                      title="Xuất TCMMXD"
+                      title="Xuất PDF TCMMXD"
                       onClick={e => {
                         e.stopPropagation();
                         onDownloadTcmmxd(c.id);
                       }}
-                      className="p-1.5 border border-[#1A1A1A] bg-white hover:bg-[#FFD700] rounded text-[#1A1A1A] transition-colors font-black text-[10px]"
+                      className="w-7 h-7 flex items-center justify-center border border-[#DDD] bg-white hover:bg-[#E3F2FD] hover:border-[#2196F3] hover:text-[#1976D2] rounded-lg text-[#555] transition-all"
                     >
-                      TC
+                      <FileText size={13} />
                     </button>
                     <button
                       type="button"
+                      title="Chỉnh sửa hồ sơ"
                       onClick={e => {
                         e.stopPropagation();
                         onSelectCandidate(c.id);
                       }}
-                      className="artistic-btn-secondary px-2.5 py-1 text-xs rounded font-bold"
+                      className="h-7 px-2.5 text-xs font-black rounded-lg border border-[#DDD] bg-white hover:bg-[#FFD700] hover:border-[#1A1A1A] text-[#1A1A1A] transition-all flex items-center gap-1"
                     >
-                      Sửa
+                      <Edit size={12} />
+                      <span>Sửa</span>
                     </button>
                     <button
                       type="button"
@@ -248,9 +286,9 @@ export function CandidateList({
                         e.stopPropagation();
                         onDeleteCandidate(c.id);
                       }}
-                      className="p-1.5 border border-[#D32F2F] bg-[#FFF5F5] hover:bg-[#D32F2F] hover:text-white rounded text-[#D32F2F] transition-colors"
+                      className="w-7 h-7 flex items-center justify-center border border-[#DDD] bg-white hover:bg-[#FFEBEE] hover:border-[#D32F2F] hover:text-[#D32F2F] rounded-lg text-[#999] transition-all"
                     >
-                      <Trash2 size={14} />
+                      <Trash2 size={13} />
                     </button>
                   </div>
                 </div>
@@ -261,27 +299,62 @@ export function CandidateList({
       )}
 
       {/* Pagination Controls */}
-      <div className="flex justify-center items-center gap-4 mt-8">
-        <button
-          onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-          disabled={currentPage === 1}
-          className="p-2 border-2 border-[#1A1A1A] bg-white rounded shadow-[2px_2px_0_0_#1A1A1A] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#FFD700] transition-colors"
-        >
-          <ChevronLeft size={20} />
-        </button>
+      {totalPages > 1 && (
+        <div className="flex justify-center items-center gap-2 mt-6">
+          <button
+            onClick={() => setCurrentPage(1)}
+            disabled={currentPage === 1}
+            className="px-2.5 py-1.5 border-2 border-[#1A1A1A] bg-white rounded-lg shadow-[2px_2px_0_0_#1A1A1A] disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#FFD700] transition-colors text-xs font-black"
+          >
+            «
+          </button>
+          <button
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            className="p-1.5 border-2 border-[#1A1A1A] bg-white rounded-lg shadow-[2px_2px_0_0_#1A1A1A] disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#FFD700] transition-colors"
+          >
+            <ChevronLeft size={16} />
+          </button>
 
-        <span className="font-extrabold text-sm uppercase tracking-wider">
-          Trang {currentPage} / {totalPages} (Tổng {filteredCandidates.length} hồ sơ)
-        </span>
+          <div className="flex items-center gap-1">
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+              let page: number;
+              if (totalPages <= 5) page = i + 1;
+              else if (currentPage <= 3) page = i + 1;
+              else if (currentPage >= totalPages - 2) page = totalPages - 4 + i;
+              else page = currentPage - 2 + i;
+              return (
+                <button
+                  key={page}
+                  onClick={() => setCurrentPage(page)}
+                  className={`w-8 h-8 text-xs font-black rounded-lg border-2 transition-all ${
+                    page === currentPage
+                      ? 'bg-[#1A1A1A] text-white border-[#1A1A1A] shadow-[2px_2px_0_0_#555]'
+                      : 'bg-white border-[#DDD] hover:border-[#1A1A1A] hover:bg-[#FFD700]'
+                  }`}
+                >
+                  {page}
+                </button>
+              );
+            })}
+          </div>
 
-        <button
-          onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-          disabled={currentPage === totalPages}
-          className="p-2 border-2 border-[#1A1A1A] bg-white rounded shadow-[2px_2px_0_0_#1A1A1A] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#FFD700] transition-colors"
-        >
-          <ChevronRight size={20} />
-        </button>
-      </div>
+          <button
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+            className="p-1.5 border-2 border-[#1A1A1A] bg-white rounded-lg shadow-[2px_2px_0_0_#1A1A1A] disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#FFD700] transition-colors"
+          >
+            <ChevronRight size={16} />
+          </button>
+          <button
+            onClick={() => setCurrentPage(totalPages)}
+            disabled={currentPage === totalPages}
+            className="px-2.5 py-1.5 border-2 border-[#1A1A1A] bg-white rounded-lg shadow-[2px_2px_0_0_#1A1A1A] disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#FFD700] transition-colors text-xs font-black"
+          >
+            »
+          </button>
+        </div>
+      )}
     </div>
   );
 }

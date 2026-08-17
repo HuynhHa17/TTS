@@ -128,20 +128,60 @@ function Inp({ value, onChange, placeholder = '', type = 'text', jp = false, row
     );
   }
   if (type === 'date') {
-    const isoVal = toISODate(value);
-    const vnFormatted = formatDateVN(value);
+    const dateRef = React.useRef<HTMLInputElement>(null);
+    const rawVal = value != null ? String(value) : '';
+    const isoVal = toISODate(rawVal);
+    const vnFormatted = formatDateVN(rawVal);
     return (
-      <div className="flex flex-col gap-1 w-full">
-        <input 
-          type="date" 
-          value={isoVal} 
-          onChange={e => onChange(e.target.value)}
-          placeholder={placeholder || 'DD/MM/YYYY'} 
-          className={cls} 
-        />
-        {vnFormatted && (
+      <div className="flex flex-col gap-1 w-full relative">
+        <div className="relative flex items-center w-full">
+          <input 
+            type="text" 
+            value={rawVal} 
+            onChange={e => onChange(e.target.value)}
+            placeholder={placeholder || 'DD/MM/YYYY (VD: 15/01/2000)'} 
+            className={`${cls} pr-9`} 
+          />
+          <button
+            type="button"
+            tabIndex={-1}
+            onClick={() => {
+              if (dateRef.current) {
+                if ('showPicker' in HTMLInputElement.prototype) {
+                  try {
+                    dateRef.current.showPicker();
+                  } catch {
+                    dateRef.current.focus();
+                  }
+                } else {
+                  dateRef.current.focus();
+                }
+              }
+            }}
+            className="absolute right-2.5 text-[#888] hover:text-[#FF4D00] transition-colors p-1"
+            title="Chọn ngày từ lịch"
+          >
+            <Calendar size={15} />
+          </button>
+          {/* Hidden native date input for optional calendar picker */}
+          <input
+            ref={dateRef}
+            type="date"
+            value={isoVal}
+            onChange={e => {
+              const val = e.target.value;
+              if (val) {
+                const formatted = formatDateVN(val);
+                onChange(formatted || val);
+              }
+            }}
+            className="sr-only absolute pointer-events-none opacity-0"
+            tabIndex={-1}
+          />
+        </div>
+        {rawVal && vnFormatted && vnFormatted !== rawVal && !rawVal.includes('/') && (
           <span className="text-[11px] font-bold text-[#FF4D00] flex items-center gap-1">
-            <Calendar size={11} /> VN: {vnFormatted}
+            <Calendar size={11} /> Định dạng: {vnFormatted}
           </span>
         )}
       </div>
@@ -431,49 +471,77 @@ export function CandidateEditor({ profile, onSave, onBack, onDelete, onDownloadR
       )}
 
       {/* Header */}
-      <div className="p-4 border-b-2 border-[#1A1A1A] flex justify-between items-center bg-[#F8F7F2] rounded-t-[10px] flex-shrink-0">
+      <div className="px-5 py-3.5 border-b-2 border-[#1A1A1A] flex justify-between items-center bg-[#F8F7F2] rounded-t-[10px] flex-shrink-0 gap-4">
         <div className="flex items-center gap-3">
-          <button onClick={onBack} className="artistic-card-sm px-3 py-1.5 text-sm font-bold hover:bg-[#F0F0F0]">← Quay Lại</button>
-          <h2 className="text-lg font-extrabold uppercase tracking-tight">
+          <button 
+            onClick={onBack} 
+            className="h-9 px-3 text-xs font-black rounded-lg border-2 border-[#1A1A1A] bg-white text-[#1A1A1A] shadow-[2px_2px_0_0_#1A1A1A] hover:bg-[#FFD700] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0_0_#1A1A1A] transition-all flex items-center gap-1.5"
+          >
+            ← Quay Lại
+          </button>
+          
+          <h2 className="text-base font-black uppercase tracking-tight text-[#1A1A1A]">
             {profile ? `Sửa: ${profile.candidate.full_name_vn}` : '✨ Thêm Hồ Sơ Mới'}
           </h2>
-          <span className={`text-xs font-bold px-2 py-0.5 rounded border-2 border-[#1A1A1A] shadow-[2px_2px_0_0_#1A1A1A] uppercase
-            ${cand.status === 'completed' ? 'bg-[#00C853] text-white' : cand.status === 'reviewing' ? 'bg-[#FFD700]' : 'bg-[#E0E0E0]'}`}>
-            {cand.status}
+
+          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
+            cand.status === 'completed' 
+              ? 'bg-[#E8F5E9] text-[#1B8A3F] border-[#A5D6A7]' 
+              : cand.status === 'reviewing' 
+                ? 'bg-[#FFF8E1] text-[#B8760A] border-[#FFE082]' 
+                : 'bg-[#F5F5F5] text-[#555] border-[#DDD]'
+          }`}>
+            {cand.status === 'completed' ? '● Hoàn thành' : cand.status === 'reviewing' ? '◐ Xét duyệt' : '○ Nháp'}
           </span>
         </div>
-        <div className="flex gap-2">
+
+        <div className="flex items-center gap-2">
           {/* Nút Dịch Toàn Bộ */}
           <button
             onClick={translateAll}
             disabled={translatingAll}
-            className="border-2 border-[#7C3AED] bg-[#FAF8FF] text-[#7C3AED] px-4 py-1.5 text-xs font-extrabold rounded
-              flex items-center gap-1.5 hover:bg-[#7C3AED] hover:text-white transition-all
-              shadow-[2px_2px_0_0_#7C3AED] hover:shadow-[3px_3px_0_0_#7C3AED] active:shadow-none active:translate-x-0.5 active:translate-y-0.5
-              disabled:opacity-60 disabled:cursor-wait">
+            className="h-9 px-3 text-xs font-black rounded-lg border-2 border-[#7C3AED] bg-[#FAF8FF] text-[#7C3AED] shadow-[2px_2px_0_0_#7C3AED] hover:bg-[#7C3AED] hover:text-white transition-all flex items-center gap-1.5 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none disabled:opacity-60 disabled:cursor-wait"
+          >
             {translatingAll
               ? <span className="animate-spin inline-block w-3.5 h-3.5 border-2 border-[#7C3AED]/30 border-t-[#7C3AED] rounded-full" />
-              : <Zap size={13} />}
-            {translatingAll ? 'Đang dịch...' : '✨ Dịch Toàn Bộ'}
+              : <Zap size={14} />}
+            <span>{translatingAll ? 'Đang dịch...' : 'Dịch Toàn Bộ'}</span>
           </button>
+
           {cand.id > 0 && (
             <>
-              <button onClick={() => onDownloadRirekisho(cand.id)} className="artistic-card-sm px-3 py-1.5 text-xs font-bold hover:bg-[#F0F0F0]">📄 Rirekisho</button>
-              <button onClick={() => onDownloadTcmmxd(cand.id)} className="artistic-card-sm px-3 py-1.5 text-xs font-bold hover:bg-[#F0F0F0]">📋 TC MMXD</button>
+              <button 
+                onClick={() => onDownloadRirekisho(cand.id)} 
+                className="h-9 px-3 text-xs font-black rounded-lg border-2 border-[#1A1A1A] bg-white text-[#1A1A1A] shadow-[2px_2px_0_0_#1A1A1A] hover:bg-[#E8F5E9] hover:border-[#00C853] hover:text-[#1B8A3F] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0_0_#1A1A1A] transition-all"
+              >
+                📄 Rirekisho
+              </button>
+
+              <button 
+                onClick={() => onDownloadTcmmxd(cand.id)} 
+                className="h-9 px-3 text-xs font-black rounded-lg border-2 border-[#1A1A1A] bg-white text-[#1A1A1A] shadow-[2px_2px_0_0_#1A1A1A] hover:bg-[#E3F2FD] hover:border-[#2196F3] hover:text-[#1976D2] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0_0_#1A1A1A] transition-all"
+              >
+                📋 TC MMXD
+              </button>
+
               {onDelete && (
                 <button
                   type="button"
                   onClick={() => onDelete(cand.id)}
-                  className="border-2 border-[#D32F2F] bg-[#FFF5F5] text-[#D32F2F] px-3 py-1.5 text-xs font-extrabold rounded
-                    flex items-center gap-1 hover:bg-[#D32F2F] hover:text-white transition-all
-                    shadow-[2px_2px_0_0_#D32F2F] hover:shadow-[3px_3px_0_0_#D32F2F] active:shadow-none active:translate-x-0.5 active:translate-y-0.5"
+                  className="h-9 px-3 text-xs font-black rounded-lg border-2 border-[#D32F2F] bg-[#FFF5F5] text-[#D32F2F] shadow-[2px_2px_0_0_#D32F2F] hover:bg-[#D32F2F] hover:text-white transition-all flex items-center gap-1 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
                 >
-                  <Trash2 size={13} /> Xóa
+                  <Trash2 size={14} /> Xóa
                 </button>
               )}
             </>
           )}
-          <button onClick={handleSave} className="artistic-btn-primary px-5 py-2 text-sm rounded font-bold">💾 Lưu Hồ Sơ</button>
+
+          <button 
+            onClick={handleSave} 
+            className="h-9 px-4 text-xs font-black rounded-lg border-2 border-[#1A1A1A] bg-[#FF4D00] text-white shadow-[2px_2px_0_0_#1A1A1A] hover:bg-[#E64500] hover:shadow-[3px_3px_0_0_#1A1A1A] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0_0_#1A1A1A] transition-all flex items-center gap-1.5"
+          >
+            💾 Lưu Hồ Sơ
+          </button>
         </div>
       </div>
 
@@ -638,9 +706,9 @@ export function CandidateEditor({ profile, onSave, onBack, onDelete, onDownloadR
               <Section title="Người giám hộ / Liên lạc khẩn cấp">
                 <div className="grid grid-cols-2 gap-x-6 gap-y-4">
                   <Field label="Tên người giám hộ (VN)"><Inp value={cand.guardian_name_vn} onChange={v => setC('guardian_name_vn', v)} placeholder="Nguyễn Văn B (Cha)" /></Field>
-                  <Field label="Tên người giám hộ (JP)" jp>
+                  <Field label="Tên người giám hộ (Tiếng Anh)">
                     <div className="flex gap-2 items-end">
-                      <Inp value={cand.guardian_name_jp} onChange={v => setC('guardian_name_jp', v)} jp />
+                      <Inp value={cand.guardian_name_jp} onChange={v => setC('guardian_name_jp', v)} placeholder="NGUYEN VAN B (FATHER)" />
                       <TranslateBtn fieldName="nguoi_giam_ho_vnm" value={cand.guardian_name_vn ?? ''} onResult={v => setC('guardian_name_jp', v)} />
                     </div>
                   </Field>

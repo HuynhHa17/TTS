@@ -9,8 +9,8 @@ const shortcuts = [
   { label: 'Bảng Master Excel',      keys: ['Ctrl', '1'],   color: '#FF4D00' },
   { label: 'Danh sách ứng viên',     keys: ['Ctrl', '2'],   color: '#FF4D00' },
   { label: 'Thêm hồ sơ mới',         keys: ['Ctrl', 'N'],   color: '#7C3AED' },
+  { label: 'Chế độ Sáng / Tối',      keys: ['Ctrl', 'J'],   color: '#FFD700' },
   { label: 'Mở keyboard shortcuts',  keys: ['Ctrl', 'K'],   color: '#7C3AED' },
-  { label: 'Import Google Sheets',   keys: ['Ctrl', 'I'],   color: '#00C853' },
   { label: 'Xuất file hàng loạt',    keys: ['Ctrl', 'B'],   color: '#00C853' },
   { label: 'Đóng modal / Thoát',     keys: ['Esc'],          color: '#888'    },
 ];

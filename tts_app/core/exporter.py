@@ -98,31 +98,44 @@ def _set_col_widths(ws, widths: list):
 
 # ── Main sheet builder ────────────────────────────────────────────────────────
 
+COL60_KEYS = [
+    "id", "profile_code", "full_name_vn", "full_name_eng", "full_name_katakana", "gender",
+    "id_document_number", "id_issue_date", "id_issue_date_jp", "id_issue_place_vn", "id_issue_place_jp",
+    "passport_number", "passport_issue_date", "passport_issue_date_jp", "passport_issue_place_vn", "passport_issue_place_jp",
+    "date_of_birth", "date_of_birth_jp", "marital_status", "has_children",
+    "address_vn", "address_jp", "birthplace_vn", "birthplace_jp",
+    "guardian_name_vn", "guardian_name_jp", "guardian_address_vn", "guardian_address_jp", "guardian_phone",
+    "school1_period", "school1_name", "school2_period", "school2_name", "school3_period", "school3_name",
+    "work1_period", "work1_name", "work2_period", "work2_name", "work3_period", "work3_name",
+    "internship_field_vn", "internship_field_jp", "skill_summary_jp", "skill_summary_vn",
+    "syndicate_name_vn", "syndicate_name_jp", "syndicate_address_vn", "syndicate_address_jp", "syndicate_rep_vn", "syndicate_rep_jp",
+    "company_name_vn", "company_name_jp", "company_address_vn", "company_address_jp", "company_rep_vn", "company_rep_jp",
+    "dispatching_company_vn", "dispatching_company_rep_vn", "phone"
+]
+
+
 def build_master_sheet(ws, candidates: list, sheet_name: str = None):
     """Write candidates to a master sheet with 60-col format."""
     ws.title = sheet_name or f"Thang {datetime.now().strftime('%m')}"
     ws.freeze_panes = "B2"
 
     # Header
-    headers = ["STT"] + COL60_HEADERS[1:]  # exclude col 0 which is STT
     for col_idx, h in enumerate(COL60_HEADERS, 1):
         ws.cell(row=1, column=col_idx, value=h)
     _style_header_row(ws, 1, len(COL60_HEADERS))
     _set_col_widths(ws, _COL_WIDTHS)
     ws.row_dimensions[1].height = 30
 
-    keys = Candidate.col60_keys()
-
     for row_idx, cand in enumerate(candidates, 2):
         alt = (row_idx % 2 == 0)
-        for col_idx, key in enumerate(keys, 1):
+        for col_idx, key in enumerate(COL60_KEYS, 1):
             val = cand.get(key) if isinstance(cand, dict) else getattr(cand, key, None)
             if key == "id":
                 val = row_idx - 1  # STT
             if val is None:
                 val = ""
             ws.cell(row=row_idx, column=col_idx, value=val)
-        _style_data_row(ws, row_idx, len(keys), alt)
+        _style_data_row(ws, row_idx, len(COL60_KEYS), alt)
         ws.row_dimensions[row_idx].height = 20
 
     # Auto-filter

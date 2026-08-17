@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { Candidate, CustomFieldDef } from '../types';
-import { Search, ChevronLeft, ChevronRight, Trash2, FileDown, CheckSquare, Square, Edit } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, Trash2, FileDown, CheckSquare, Square, Edit, FileSpreadsheet } from 'lucide-react';
 import { formatDateVN } from '../utils/dateFormat';
 
 interface ExcelDashboardProps {
   isLoading: boolean;
-  onOpenGoogleSheetImport: () => void;
+  onOpenImportForm?: () => void;
   onSelectCandidate: (id: number) => void;
   onDeleteCandidate?: (id: number) => void;
   onDownloadRirekisho: (id: number) => void;
@@ -19,7 +19,7 @@ const ITEMS_PER_PAGE = 15;
 
 export function ExcelDashboard({
   isLoading,
-  onOpenGoogleSheetImport,
+  onOpenImportForm,
   onSelectCandidate,
   onDeleteCandidate,
   onDownloadRirekisho,
@@ -31,6 +31,13 @@ export function ExcelDashboard({
   const [customFieldDefs, setCustomFieldDefs] = useState<CustomFieldDef[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  // Auto-focus search input on mount
+  useEffect(() => {
+    const timer = setTimeout(() => searchRef.current?.focus(), 100);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     fetch('/api/settings')
@@ -61,10 +68,7 @@ export function ExcelDashboard({
       <div className="artistic-card p-12 text-center flex flex-col items-center justify-center min-h-[400px]">
         <div className="text-6xl mb-4">📭</div>
         <h2 className="text-2xl font-extrabold mb-2 uppercase">Chưa Có Dữ Liệu</h2>
-        <p className="text-[#555] font-medium mb-6">Hãy import từ Google Sheets hoặc thêm mới thủ công.</p>
-        <button onClick={onOpenGoogleSheetImport} className="artistic-btn-primary px-6 py-3 rounded-md flex items-center gap-2">
-          Import Google Sheets
-        </button>
+        <p className="text-[#555] font-medium mb-6">Hãy nạp hồ sơ từ Tờ đơn hoặc thêm mới ứng viên thủ công.</p>
       </div>
     );
   }
@@ -123,150 +127,191 @@ export function ExcelDashboard({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Stats Cards */}
-      <div className="flex gap-4">
-        <div className="artistic-card flex-1 p-4 flex flex-col items-start">
-          <span className="text-4xl font-black">{dbCandidates.length}</span>
-          <span className="text-xs font-bold text-[#555] uppercase tracking-wider">Tổng Hồ Sơ</span>
+      <div className="grid grid-cols-4 gap-3">
+        <div className="bg-white border-2 border-[#1A1A1A] shadow-[3px_3px_0_0_#1A1A1A] rounded-xl p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-[#1A1A1A] flex items-center justify-center text-white text-lg font-black flex-shrink-0">Σ</div>
+          <div>
+            <div className="text-3xl font-black leading-none">{dbCandidates.length}</div>
+            <div className="text-[10px] font-bold text-[#666] uppercase tracking-widest mt-0.5">Tổng Hồ Sơ</div>
+          </div>
         </div>
-        <div className="artistic-card flex-1 p-4 flex flex-col items-start border-t-4 border-t-[#00E5FF]">
-          <span className="text-4xl font-black">{dbCandidates.filter(c => c.status === 'draft').length}</span>
-          <span className="text-xs font-bold text-[#555] uppercase tracking-wider">Nháp</span>
+        <div className="bg-white border-2 border-[#1A1A1A] shadow-[3px_3px_0_0_#1A1A1A] rounded-xl p-4 flex items-center gap-3 border-l-4 border-l-[#00B4D8]">
+          <div className="w-10 h-10 rounded-lg bg-[#E0F7FF] flex items-center justify-center text-[#00B4D8] text-lg flex-shrink-0">✎</div>
+          <div>
+            <div className="text-3xl font-black leading-none text-[#00B4D8]">{dbCandidates.filter(c => c.status === 'draft').length}</div>
+            <div className="text-[10px] font-bold text-[#666] uppercase tracking-widest mt-0.5">Nháp</div>
+          </div>
         </div>
-        <div className="artistic-card flex-1 p-4 flex flex-col items-start border-t-4 border-t-[#FFD700]">
-          <span className="text-4xl font-black">{dbCandidates.filter(c => c.status === 'reviewing').length}</span>
-          <span className="text-xs font-bold text-[#555] uppercase tracking-wider">Đang Xử Lý</span>
+        <div className="bg-white border-2 border-[#1A1A1A] shadow-[3px_3px_0_0_#1A1A1A] rounded-xl p-4 flex items-center gap-3 border-l-4 border-l-[#F59E0B]">
+          <div className="w-10 h-10 rounded-lg bg-[#FFF8E1] flex items-center justify-center text-[#F59E0B] text-lg flex-shrink-0">⏳</div>
+          <div>
+            <div className="text-3xl font-black leading-none text-[#F59E0B]">{dbCandidates.filter(c => c.status === 'reviewing').length}</div>
+            <div className="text-[10px] font-bold text-[#666] uppercase tracking-widest mt-0.5">Đang Xử Lý</div>
+          </div>
         </div>
-        <div className="artistic-card flex-1 p-4 flex flex-col items-start border-t-4 border-t-[#00C853]">
-          <span className="text-4xl font-black">{dbCandidates.filter(c => c.status === 'completed').length}</span>
-          <span className="text-xs font-bold text-[#555] uppercase tracking-wider">Hoàn Thành</span>
+        <div className="bg-white border-2 border-[#1A1A1A] shadow-[3px_3px_0_0_#1A1A1A] rounded-xl p-4 flex items-center gap-3 border-l-4 border-l-[#00C853]">
+          <div className="w-10 h-10 rounded-lg bg-[#E8F5E9] flex items-center justify-center text-[#00C853] text-lg flex-shrink-0">✓</div>
+          <div>
+            <div className="text-3xl font-black leading-none text-[#00C853]">{dbCandidates.filter(c => c.status === 'completed').length}</div>
+            <div className="text-[10px] font-bold text-[#666] uppercase tracking-widest mt-0.5">Hoàn Thành</div>
+          </div>
         </div>
       </div>
 
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3 flex-1 max-w-md">
-          <div className="relative w-full">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#555]" size={18} />
-            <input 
-              type="text" 
-              placeholder="Tìm theo tên, mã HS, Katakana, SĐT..." 
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white border-2 border-[#1A1A1A] shadow-[2px_2px_0_0_#1A1A1A] rounded-xl px-4 py-3">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <div className="relative flex-1 max-w-lg">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#999]" size={16} />
+            <input
+              ref={searchRef}
+              type="text"
+              placeholder="Tìm theo tên, mã HS, Katakana, SĐT..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              className="artistic-input w-full py-2.5 pl-10 pr-4 font-medium"
+              className="artistic-input w-full py-2 pl-9 pr-4 text-sm font-medium"
             />
           </div>
+          {filteredCandidates.length !== dbCandidates.length && (
+            <span className="text-xs font-bold text-[#FF4D00] whitespace-nowrap">
+              {filteredCandidates.length} kết quả
+            </span>
+          )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           {selectedIds.length > 0 && onDeleteCandidate && (
             <button
               onClick={handleBatchDelete}
-              className="border-2 border-[#D32F2F] bg-[#FFF5F5] text-[#D32F2F] px-4 py-2 text-xs font-black uppercase rounded
+              className="border-2 border-[#D32F2F] bg-[#FFF5F5] text-[#D32F2F] px-3 py-1.5 text-xs font-black uppercase rounded-lg
                 flex items-center gap-1.5 hover:bg-[#D32F2F] hover:text-white transition-all
-                shadow-[2px_2px_0_0_#D32F2F] hover:shadow-[3px_3px_0_0_#D32F2F] active:scale-95"
+                shadow-[2px_2px_0_0_#D32F2F] active:scale-95"
             >
-              <Trash2 size={15} /> Xóa ({selectedIds.length}) Đã Chọn
+              <Trash2 size={14} /> Xóa ({selectedIds.length})
             </button>
           )}
+
+          {onOpenImportForm && (
+            <button
+              type="button"
+              onClick={onOpenImportForm}
+              title="Import file Excel đơn điền hoặc tải mẫu tờ đơn"
+              className="h-9 px-3 text-xs font-black rounded-lg border-2 border-[#1A1A1A] bg-[#FFD700] text-[#1A1A1A] shadow-[2px_2px_0_0_#1A1A1A] hover:shadow-[3px_3px_0_0_#1A1A1A] hover:bg-[#FFE033] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0_0_#1A1A1A] transition-all flex items-center gap-1.5"
+            >
+              <FileSpreadsheet size={14} />
+              <span>Import Đơn</span>
+            </button>
+          )}
+
+          <span className="text-xs text-[#999] font-medium hidden sm:block">
+            {startIndex + 1}–{Math.min(startIndex + ITEMS_PER_PAGE, filteredCandidates.length)} / {filteredCandidates.length}
+          </span>
         </div>
       </div>
 
       {/* Table */}
-      <div className="artistic-card overflow-hidden">
-        <div className="overflow-x-auto max-h-[calc(100vh-320px)]">
+      <div className="border-2 border-[#1A1A1A] shadow-[3px_3px_0_0_#1A1A1A] rounded-xl overflow-hidden">
+        <div className="overflow-x-auto" style={{ maxHeight: 'calc(100vh - 340px)' }}>
           <table className="w-full text-left border-collapse text-sm">
-            <thead className="bg-[#1A1A1A] text-white sticky top-0 z-10">
+            <thead className="sticky top-0 z-10" style={{ background: 'linear-gradient(135deg, #1A1A1A 0%, #2D2D2D 100%)' }}>
               <tr>
                 {setSelectedIds && (
-                  <th className="p-3 border-r border-white/20 w-10 text-center">
+                  <th className="px-3 py-3.5 border-r border-white/10 w-10 text-center">
                     <button
                       type="button"
                       onClick={handleToggleSelectAll}
-                      className="text-white hover:text-[#FFD700] transition-colors"
+                      className="text-white/70 hover:text-[#FFD700] transition-colors"
                       title={isAllSelected ? 'Bỏ chọn cả trang' : 'Chọn cả trang'}
                     >
-                      {isAllSelected ? <CheckSquare size={16} /> : <Square size={16} />}
+                      {isAllSelected ? <CheckSquare size={15} /> : <Square size={15} />}
                     </button>
                   </th>
                 )}
-                <th className="p-3 font-extrabold uppercase text-xs border-r border-white/20 whitespace-nowrap">Mã HS</th>
-                <th className="p-3 font-extrabold uppercase text-xs border-r border-white/20 whitespace-nowrap">Họ Tên (VN)</th>
-                <th className="p-3 font-extrabold uppercase text-xs border-r border-white/20 whitespace-nowrap">Katakana</th>
-                <th className="p-3 font-extrabold uppercase text-xs border-r border-white/20 whitespace-nowrap">Ngày Sinh</th>
-                <th className="p-3 font-extrabold uppercase text-xs border-r border-white/20 whitespace-nowrap">Giới Tính</th>
+                <th className="px-3 py-3.5 font-black uppercase text-[10px] tracking-widest text-[#FFD700] border-r border-white/10 whitespace-nowrap">Mã HS</th>
+                <th className="px-3 py-3.5 font-black uppercase text-[10px] tracking-widest text-white border-r border-white/10 whitespace-nowrap">Họ Tên (VN)</th>
+                <th className="px-3 py-3.5 font-black uppercase text-[10px] tracking-widest text-white/70 border-r border-white/10 whitespace-nowrap">Katakana</th>
+                <th className="px-3 py-3.5 font-black uppercase text-[10px] tracking-widest text-white/70 border-r border-white/10 whitespace-nowrap">Ngày Sinh</th>
+                <th className="px-3 py-3.5 font-black uppercase text-[10px] tracking-widest text-white/70 border-r border-white/10 whitespace-nowrap">Giới Tính</th>
                 {customFieldDefs.map(f => (
-                  <th key={f.id} className="p-3 font-extrabold uppercase text-xs border-r border-white/20 whitespace-nowrap text-[#FFD700]">
+                  <th key={f.id} className="px-3 py-3.5 font-black uppercase text-[10px] tracking-widest text-[#FFD700] border-r border-white/10 whitespace-nowrap">
                     {f.label}
                   </th>
                 ))}
-                <th className="p-3 font-extrabold uppercase text-xs border-r border-white/20 whitespace-nowrap">Trạng Thái</th>
-                <th className="p-3 font-extrabold uppercase text-xs whitespace-nowrap text-center">Thao Tác</th>
+                <th className="px-3 py-3.5 font-black uppercase text-[10px] tracking-widest text-white/70 border-r border-white/10 whitespace-nowrap">Trạng Thái</th>
+                <th className="px-3 py-3.5 font-black uppercase text-[10px] tracking-widest text-white/70 whitespace-nowrap text-center">Thao Tác</th>
               </tr>
             </thead>
-            <tbody className="bg-white">
+            <tbody className="bg-white divide-y divide-[#F0F0F0]">
               {paginatedCandidates.length === 0 ? (
                 <tr>
-                  <td colSpan={8 + customFieldDefs.length} className="p-8 text-center text-[#555] font-bold">
-                    Không tìm thấy ứng viên nào phù hợp.
+                  <td colSpan={8 + customFieldDefs.length} className="py-16 text-center text-[#888] font-bold text-sm">
+                    🔍 Không tìm thấy ứng viên nào phù hợp.
                   </td>
                 </tr>
               ) : (
                 paginatedCandidates.map((c, i) => {
                   const isSelected = selectedIds.includes(c.id);
                   return (
-                    <tr 
-                      key={c.id} 
-                      className={`border-b-2 border-[#F0F0F0] hover:bg-[#FFF9F0] cursor-pointer transition-colors ${
-                        isSelected ? 'bg-[#FFF2E0]' : i % 2 === 0 ? 'bg-[#FAFAF5]' : ''
+                    <tr
+                      key={c.id}
+                      className={`cursor-pointer transition-all duration-100 ${
+                        isSelected
+                          ? 'bg-[#FFF2E0] border-l-2 border-l-[#FF4D00]'
+                          : i % 2 === 0
+                            ? 'bg-white hover:bg-[#FFF9F5]'
+                            : 'bg-[#FAFAF5] hover:bg-[#FFF5EC]'
                       }`}
                       onClick={() => onSelectCandidate(c.id)}
                     >
                       {setSelectedIds && (
-                        <td className="p-3 text-center border-r-2 border-[#F0F0F0]" onClick={e => e.stopPropagation()}>
+                        <td className="px-3 py-2.5 text-center border-r border-[#F0F0F0]" onClick={e => e.stopPropagation()}>
                           <input
                             type="checkbox"
                             checked={isSelected}
                             onClick={e => handleToggleSelect(c.id, e)}
                             onChange={() => {}}
-                            className="w-4 h-4 cursor-pointer accent-[#FF4D00] rounded"
+                            className="w-3.5 h-3.5 cursor-pointer accent-[#FF4D00] rounded"
                           />
                         </td>
                       )}
-                      <td className="p-3 font-mono font-bold text-[#FF4D00] border-r-2 border-[#F0F0F0] whitespace-nowrap">{c.profile_code || '---'}</td>
-                      <td className="p-3 font-bold border-r-2 border-[#F0F0F0] whitespace-nowrap">{c.full_name_vn || '---'}</td>
-                      <td className="p-3 text-[#555] border-r-2 border-[#F0F0F0] whitespace-nowrap">{c.full_name_katakana || '---'}</td>
-                      <td className="p-3 font-medium border-r-2 border-[#F0F0F0] whitespace-nowrap">{formatDateVN(c.date_of_birth) || '---'}</td>
-                      <td className="p-3 font-medium border-r-2 border-[#F0F0F0] whitespace-nowrap">{c.gender || '---'}</td>
+                      <td className="px-3 py-2.5 font-mono font-black text-[#FF4D00] text-xs border-r border-[#F0F0F0] whitespace-nowrap">{c.profile_code || '---'}</td>
+                      <td className="px-3 py-2.5 font-bold text-[#1A1A1A] border-r border-[#F0F0F0] whitespace-nowrap">{c.full_name_vn || '---'}</td>
+                      <td className="px-3 py-2.5 text-[#555] text-[13px] border-r border-[#F0F0F0] whitespace-nowrap">{c.full_name_katakana || '---'}</td>
+                      <td className="px-3 py-2.5 text-[#444] font-medium border-r border-[#F0F0F0] whitespace-nowrap tabular-nums">{formatDateVN(c.date_of_birth) || '---'}</td>
+                      <td className="px-3 py-2.5 text-[#444] font-medium border-r border-[#F0F0F0] whitespace-nowrap">{c.gender || '---'}</td>
                       {customFieldDefs.map(f => (
-                        <td key={f.id} className="p-3 font-medium border-r-2 border-[#F0F0F0] whitespace-nowrap text-[#555]">
+                        <td key={f.id} className="px-3 py-2.5 font-medium border-r border-[#F0F0F0] whitespace-nowrap text-[#555]">
                           {c.custom_fields?.[f.id] || '---'}
                         </td>
                       ))}
-                      <td className="p-3 border-r-2 border-[#F0F0F0] whitespace-nowrap">
-                        <span className={`px-2 py-0.5 rounded text-xs font-bold border-2 border-[#1A1A1A] shadow-[1.5px_1.5px_0_0_#1A1A1A] uppercase
-                          ${c.status === 'completed' ? 'bg-[#00C853] text-white' : 
-                            c.status === 'reviewing' ? 'bg-[#FFD700] text-[#1A1A1A]' : 
-                            'bg-[#E0E0E0] text-[#1A1A1A]'}`}>
-                          {c.status || 'Draft'}
+                      <td className="px-3 py-2.5 border-r border-[#F0F0F0] whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
+                          c.status === 'completed'
+                            ? 'bg-[#E8F5E9] text-[#1B8A3F] border-[#A5D6A7]'
+                            : c.status === 'reviewing'
+                              ? 'bg-[#FFF8E1] text-[#B8760A] border-[#FFE082]'
+                              : 'bg-[#F5F5F5] text-[#555] border-[#DDD]'
+                        }`}>
+                          {c.status === 'completed' ? '● Hoàn thành' : c.status === 'reviewing' ? '◐ Xét duyệt' : '○ Nháp'}
                         </span>
                       </td>
-                      <td className="p-3 whitespace-nowrap text-center" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center justify-center gap-1.5">
+                      <td className="px-3 py-2.5 whitespace-nowrap text-center" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-center gap-1">
                           <button
                             type="button"
                             title="Chỉnh sửa"
                             onClick={() => onSelectCandidate(c.id)}
-                            className="p-1.5 border border-[#1A1A1A] bg-white hover:bg-[#FFD700] rounded text-[#1A1A1A] transition-colors"
+                            className="p-1.5 border border-[#DDD] bg-white hover:bg-[#FFD700] hover:border-[#1A1A1A] rounded-lg text-[#444] transition-all"
                           >
                             <Edit size={13} />
                           </button>
                           <button
                             type="button"
-                            title="Xuất Rirekisho"
+                            title="Xuất Rirekisho Excel"
                             onClick={() => onDownloadRirekisho(c.id)}
-                            className="p-1.5 border border-[#1A1A1A] bg-white hover:bg-[#FFD700] rounded text-[#1A1A1A] transition-colors"
+                            className="p-1.5 border border-[#DDD] bg-white hover:bg-[#E8F5E9] hover:border-[#00C853] rounded-lg text-[#444] hover:text-[#1B8A3F] transition-all"
                           >
                             <FileDown size={13} />
                           </button>
@@ -275,7 +320,7 @@ export function ExcelDashboard({
                               type="button"
                               title="Xóa hồ sơ"
                               onClick={() => onDeleteCandidate(c.id)}
-                              className="p-1.5 border border-[#D32F2F] bg-[#FFF5F5] hover:bg-[#D32F2F] hover:text-white rounded text-[#D32F2F] transition-colors"
+                              className="p-1.5 border border-[#DDD] bg-white hover:bg-[#FFEBEE] hover:border-[#D32F2F] rounded-lg text-[#999] hover:text-[#D32F2F] transition-all"
                             >
                               <Trash2 size={13} />
                             </button>
@@ -292,27 +337,62 @@ export function ExcelDashboard({
       </div>
 
       {/* Pagination Controls */}
-      <div className="flex justify-center items-center gap-4 mt-6">
-        <button
-          onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-          disabled={currentPage === 1}
-          className="p-2 border-2 border-[#1A1A1A] bg-white rounded shadow-[2px_2px_0_0_#1A1A1A] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#FFD700] transition-colors"
-        >
-          <ChevronLeft size={20} />
-        </button>
+      {totalPages > 1 && (
+        <div className="flex justify-center items-center gap-2 mt-4">
+          <button
+            onClick={() => setCurrentPage(1)}
+            disabled={currentPage === 1}
+            className="px-2.5 py-1.5 border-2 border-[#1A1A1A] bg-white rounded-lg shadow-[2px_2px_0_0_#1A1A1A] disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#FFD700] transition-colors text-xs font-black"
+          >
+            «
+          </button>
+          <button
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            className="p-1.5 border-2 border-[#1A1A1A] bg-white rounded-lg shadow-[2px_2px_0_0_#1A1A1A] disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#FFD700] transition-colors"
+          >
+            <ChevronLeft size={16} />
+          </button>
 
-        <span className="font-extrabold text-sm uppercase tracking-wider">
-          Trang {currentPage} / {totalPages} (Tổng {filteredCandidates.length} hồ sơ)
-        </span>
+          <div className="flex items-center gap-1">
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+              let page: number;
+              if (totalPages <= 5) page = i + 1;
+              else if (currentPage <= 3) page = i + 1;
+              else if (currentPage >= totalPages - 2) page = totalPages - 4 + i;
+              else page = currentPage - 2 + i;
+              return (
+                <button
+                  key={page}
+                  onClick={() => setCurrentPage(page)}
+                  className={`w-8 h-8 text-xs font-black rounded-lg border-2 transition-all ${
+                    page === currentPage
+                      ? 'bg-[#1A1A1A] text-white border-[#1A1A1A] shadow-[2px_2px_0_0_#555]'
+                      : 'bg-white border-[#DDD] hover:border-[#1A1A1A] hover:bg-[#FFD700]'
+                  }`}
+                >
+                  {page}
+                </button>
+              );
+            })}
+          </div>
 
-        <button
-          onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-          disabled={currentPage === totalPages}
-          className="p-2 border-2 border-[#1A1A1A] bg-white rounded shadow-[2px_2px_0_0_#1A1A1A] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#FFD700] transition-colors"
-        >
-          <ChevronRight size={20} />
-        </button>
-      </div>
+          <button
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+            className="p-1.5 border-2 border-[#1A1A1A] bg-white rounded-lg shadow-[2px_2px_0_0_#1A1A1A] disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#FFD700] transition-colors"
+          >
+            <ChevronRight size={16} />
+          </button>
+          <button
+            onClick={() => setCurrentPage(totalPages)}
+            disabled={currentPage === totalPages}
+            className="px-2.5 py-1.5 border-2 border-[#1A1A1A] bg-white rounded-lg shadow-[2px_2px_0_0_#1A1A1A] disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#FFD700] transition-colors text-xs font-black"
+          >
+            »
+          </button>
+        </div>
+      )}
     </div>
   );
 }

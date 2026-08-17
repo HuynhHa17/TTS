@@ -568,7 +568,7 @@ def import_from_excel():
         db.close()
 
 
-@excel_io_bp.route("/excel/export", methods=["GET"])
+@excel_io_bp.route("/excel/export", methods=["GET", "POST"])
 def export_to_excel():
     """Xuất toàn bộ SQLite → ghi vào File_lưu.xlsx."""
     db = get_session()

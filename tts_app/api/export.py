@@ -5,7 +5,7 @@ from io import BytesIO
 import openpyxl
 from flask import Blueprint, jsonify, send_file, request
 from core.database import get_session
-from core.models import Candidate, AppSettings
+from core.models import Candidate, AppSettings, Organization, to_dict
 from core.exporter import export_to_excel, _style_header_row, COL60_HEADERS
 from core.pdf_exporter import build_rirekisho_pdf
 from api.candidates import _build_full_profile
@@ -54,17 +54,45 @@ def export_template():
     )
 
 
-@export_bp.route("/export", methods=["GET"])
+def _org_to_syndicate_dict(org) -> dict:
+    """Map Organization (type=supervising) → dict cho build_syndicate_sheet."""
+    return {
+        "id":            org.id,
+        "ten_vnm":       org.name_vn or "",
+        "ten_jpn":       org.name_jp or "",
+        "chu_tich_vnm":  org.representative_vn or "",
+        "chu_tich_jpn":  org.representative_jp or "",
+        "dia_chi_vnm":   org.address_vn or "",
+        "dia_chi_jpn":   org.address_jp or "",
+        "so_dien_thoai": org.phone or "",
+    }
+
+
+def _org_to_company_dict(org) -> dict:
+    """Map Organization (type=accepting) → dict cho build_company_sheet."""
+    return {
+        "id":            org.id,
+        "ten_vnm":       org.name_vn or "",
+        "ten_jpn":       org.name_jp or "",
+        "giam_doc_vnm":  org.representative_vn or "",
+        "giam_doc_jpn":  org.representative_jp or "",
+        "dia_chi_vnm":   org.address_vn or "",
+        "dia_chi_jpn":   org.address_jp or "",
+        "so_dien_thoai": org.phone or "",
+    }
+
+
+@export_bp.route("/export", methods=["GET", "POST"])
 def export_excel():
     db = get_session()
     try:
         candidates = db.query(Candidate).order_by(Candidate.id).all()
-        syndicates = db.query(Syndicate).order_by(Syndicate.id).all()
-        companies  = db.query(Company).order_by(Company.id).all()
+        syndicates = db.query(Organization).filter(Organization.type == "supervising").order_by(Organization.id).all()
+        companies  = db.query(Organization).filter(Organization.type == "accepting").order_by(Organization.id).all()
 
-        c_dicts = [c.to_dict() for c in candidates]
-        s_dicts = [s.to_dict() for s in syndicates]
-        co_dicts= [co.to_dict() for co in companies]
+        c_dicts  = [to_dict(c) for c in candidates]
+        s_dicts  = [_org_to_syndicate_dict(s) for s in syndicates]
+        co_dicts = [_org_to_company_dict(co) for co in companies]
     finally:
         db.close()
 

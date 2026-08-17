@@ -62,14 +62,14 @@ def _generate(api_key: str, prompt: str) -> str:
     raise RuntimeError("Không nhận được phản hồi từ Gemini API.")
 
 
-TRANSLATE_PROMPT = """Ban la chuyen gia dich thuat ho so thuc tap sinh (TTS) Viet Nam sang tieng Nhat.
-Hay dich cac truong thong tin sau sang tieng Nhat theo dung yeu cau:
+TRANSLATE_PROMPT = """Ban la chuyen gia dich thuat ho so thuc tap sinh (TTS) Viet Nam sang tieng Nhat va tieng Anh.
+Hay dich cac truong thong tin sau theo dung yeu cau:
 
 - ten_vnm (ten nguoi): Chuyen sang Katakana phien am chuan (vi du: NGUYEN VAN A -> グエン ヴァン アー)
 - dia_chi_vnm (dia chi): Dich sang tieng Nhat tu nhien, giu ten rieng
 - noi_sinh_vnm (noi sinh): Dich ten tinh/thanh pho sang tieng Nhat
 - noi_cap_cccd_vnm / noi_cap_hc_vnm: Dich sang tieng Nhat
-- nguoi_giam_ho_vnm: Dich quan he sang tieng Nhat (Cha->父, Me->母, v.v.)
+- nguoi_giam_ho_vnm (ten nguoi giam ho): Chuyen ten nguoi giam ho sang TIENG ANH viet hoa khong dau (co the kem quan he tieng Anh, vi du: "Nguyen Van B (Cha)" -> "NGUYEN VAN B (FATHER)" hoac "NGUYEN VAN B", "Tran Thi C (Me)" -> "TRAN THI C (MOTHER)")
 - ten_truong_X: Phien am hoac dich sang tieng Nhat
 - ten_dn_X: Phien am hoac dich ten cong ty sang tieng Nhat
 - nganh_nghe_vnm: Dich sang tieng Nhat chuyen nganh
@@ -149,6 +149,17 @@ def translate_single(field_name: str, value: str, api_key: str) -> Optional[str]
                 return f"{d.year}年{d.month:02d}月{d.day:02d}日"
             except ValueError:
                 pass
+
+    if "giam_ho" in field_name.lower() or "guardian" in field_name.lower():
+        prompt = f"""Chuyen ten nguoi giam ho sau sang tieng Anh viet hoa khong dau (neu co quan he nhu Cha, Me thi dich quan he sang tieng Anh nhu FATHER, MOTHER):
+Gia tri: {value}
+Vi du:
+- "Nguyen Van A (Cha)" -> "NGUYEN VAN A (FATHER)"
+- "Le Thi B (Me)" -> "LE THI B (MOTHER)"
+- "Tran Van C" -> "TRAN VAN C"
+
+Chi tra ve ten tieng Anh viet hoa, khong giai thich."""
+        return _generate(api_key, prompt)
 
     prompt = f"""Dich gia tri sau sang tieng Nhat cho ho so TTS:
 Truong: {field_name}

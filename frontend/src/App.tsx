@@ -4,7 +4,7 @@ import { CandidateEditor } from './components/CandidateEditor';
 import { CandidateList } from './components/CandidateList';
 import { ExcelDashboard } from './components/ExcelDashboard';
 import { ExcelConfigModal } from './components/ExcelConfigModal';
-import { GoogleSheetImportModal } from './components/GoogleSheetImportModal';
+import { ImportFormModal } from './components/ImportFormModal';
 import { Header } from './components/Header';
 import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
 import { TemplateManagerModal } from './components/TemplateManagerModal';
@@ -23,7 +23,7 @@ export default function App() {
   const [selectedCandidateProfile, setSelectedCandidateProfile] = useState<FullCandidateProfile | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isBatchModalOpen, setIsBatchModalOpen] = useState<boolean>(false);
-  const [isGoogleSheetImportOpen, setIsGoogleSheetImportOpen] = useState<boolean>(false);
+  const [isImportFormModalOpen, setIsImportFormModalOpen] = useState<boolean>(false);
   const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState<boolean>(false);
   const [isExcelConfigOpen, setIsExcelConfigOpen] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
@@ -65,6 +65,29 @@ export default function App() {
     fetchCandidates();
   }, []);
 
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    const saved = localStorage.getItem('tts_theme');
+    if (saved === 'dark' || saved === 'light') return saved;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  });
+
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    localStorage.setItem('tts_theme', theme);
+  }, [theme]);
+
+  const toggleTheme = useCallback(() => {
+    setTheme(prev => {
+      const next = prev === 'light' ? 'dark' : 'light';
+      showToast('info', next === 'dark' ? '🌙 Chế độ Tối (Dark Mode)' : '☀️ Chế độ Sáng (Light Mode)', undefined, 2000);
+      return next;
+    });
+  }, [showToast]);
+
   // Global Keyboard Event Listeners for Power Users
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -82,11 +105,18 @@ export default function App() {
           e.preventDefault();
           return;
         }
-        if (isGoogleSheetImportOpen) {
-          setIsGoogleSheetImportOpen(false);
+        if (isImportFormModalOpen) {
+          setIsImportFormModalOpen(false);
           e.preventDefault();
           return;
         }
+      }
+
+      // Cmd/Ctrl + J or Cmd/Ctrl + Shift + D: Toggle Light/Dark Mode
+      if (isMod && (e.key === 'j' || e.key === 'J')) {
+        e.preventDefault();
+        toggleTheme();
+        return;
       }
 
       // Cmd/Ctrl + K: Toggle Keyboard Shortcuts Modal
@@ -108,13 +138,6 @@ export default function App() {
       if (isMod && (e.key === 'b' || e.key === 'B')) {
         e.preventDefault();
         setIsBatchModalOpen(prev => !prev);
-        return;
-      }
-
-      // Cmd/Ctrl + I: Open Google Sheet Import modal
-      if (isMod && (e.key === 'i' || e.key === 'I')) {
-        e.preventDefault();
-        setIsGoogleSheetImportOpen(prev => !prev);
         return;
       }
 
@@ -150,7 +173,7 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isShortcutsModalOpen, isBatchModalOpen, isGoogleSheetImportOpen]);
+  }, [isShortcutsModalOpen, isBatchModalOpen, isImportFormModalOpen, toggleTheme]);
 
   const fetchCandidates = async () => {
     setIsLoading(true);
@@ -354,7 +377,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8F7F2] font-sans text-[#1A1A1A] antialiased selection:bg-[#FF4D00] selection:text-white">
+    <div className="min-h-screen bg-[#F8F7F2] dark:bg-[#121212] font-sans text-[#1A1A1A] dark:text-[#EDEDED] antialiased selection:bg-[#FF4D00] selection:text-white transition-colors duration-200">
       <Header
         activeTab={activeTab}
         setActiveTab={(tab) => {
@@ -364,9 +387,11 @@ export default function App() {
           setActiveTab(tab);
         }}
         candidateCount={candidates.length}
+        theme={theme}
+        onToggleTheme={toggleTheme}
         onOpenBatchExport={() => setIsBatchModalOpen(true)}
         onOpenKhaiTtExport={handleDownloadKhaiTtMaster}
-        onOpenGoogleSheetImport={() => setIsGoogleSheetImportOpen(true)}
+        onOpenImportForm={() => setIsImportFormModalOpen(true)}
         onOpenShortcutsModal={() => setIsShortcutsModalOpen(true)}
         onOpenExcelConfig={() => setIsExcelConfigOpen(true)}
         onOpenSettings={() => setIsSettingsOpen(true)}
@@ -379,7 +404,7 @@ export default function App() {
         {activeTab === 'excel' && (
           <ExcelDashboard
             isLoading={isLoading}
-            onOpenGoogleSheetImport={() => setIsGoogleSheetImportOpen(true)}
+            onOpenImportForm={() => setIsImportFormModalOpen(true)}
             onSelectCandidate={handleSelectCandidate}
             onDeleteCandidate={handleDeleteCandidate}
             onDownloadRirekisho={handleDownloadRirekisho}
@@ -397,7 +422,7 @@ export default function App() {
             setSelectedIds={setSelectedIds}
             onSelectCandidate={handleSelectCandidate}
             onAddNew={handleAddNewCandidate}
-            onOpenGoogleSheetImport={() => setIsGoogleSheetImportOpen(true)}
+            onOpenImportForm={() => setIsImportFormModalOpen(true)}
             onDeleteCandidate={handleDeleteCandidate}
             onDownloadRirekisho={handleDownloadRirekisho}
             onDownloadTcmmxd={handleDownloadTcmmxd}
@@ -420,6 +445,17 @@ export default function App() {
         {activeTab === 'templates' && <TemplateManagerModal />}
       </main>
 
+      {/* Import Candidate Form Modal */}
+      <ImportFormModal
+        isOpen={isImportFormModalOpen}
+        onClose={() => setIsImportFormModalOpen(false)}
+        onSuccess={(cid) => {
+          fetchCandidates();
+          if (cid) handleSelectCandidate(cid);
+        }}
+        showToast={showToast}
+      />
+
       {/* Batch Export Modal */}
       <BatchExportModal
         candidates={candidates}
@@ -427,13 +463,6 @@ export default function App() {
         isOpen={isBatchModalOpen}
         onClose={() => setIsBatchModalOpen(false)}
         onTriggerBatchExport={handleTriggerBatchExportZip}
-      />
-
-      {/* Google Sheets Import Staging Modal */}
-      <GoogleSheetImportModal
-        isOpen={isGoogleSheetImportOpen}
-        onClose={() => setIsGoogleSheetImportOpen(false)}
-        onImportComplete={() => fetchCandidates()}
       />
 
       {/* Excel Config Modal */}

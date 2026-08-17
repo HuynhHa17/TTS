@@ -64,13 +64,31 @@ export function toJapaneseDate(v: string | number | undefined | null): string {
   if (!v) return '';
   const s = String(v).trim();
   if (!s) return '';
-  // Already YYYY年MM月DD日
-  if (/^\d{4}年\d{1,2}月\d{1,2}日$/.test(s)) return s;
+  // Already YYYY年MM月DD日 or YYYY年MM月 or YYYY年
+  if (/^\d{4}年(\d{1,2}月)?(\d{1,2}日)?$/.test(s)) return s;
+
+  // Full date: DD/MM/YYYY or YYYY-MM-DD
   const iso = toISODate(s);
   const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (m) {
     return `${m[1]}年${m[2]}月${m[3]}日`;
   }
+
+  // MM/YYYY or YYYY-MM
+  const mMonth = s.match(/^(\d{1,2})[\/\-\.](\d{4})$/);
+  if (mMonth) {
+    return `${mMonth[2]}年${mMonth[1].padStart(2, '0')}月`;
+  }
+  const mYearMonth = s.match(/^(\d{4})[\/\-\.](\d{1,2})$/);
+  if (mYearMonth) {
+    return `${mYearMonth[1]}年${mYearMonth[2].padStart(2, '0')}月`;
+  }
+
+  // Year only YYYY
+  if (/^\d{4}$/.test(s)) {
+    return `${s}年`;
+  }
+
   return s;
 }
 

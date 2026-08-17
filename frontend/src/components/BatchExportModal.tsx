@@ -71,8 +71,10 @@ export function BatchExportModal({ candidates, selectedIds, isOpen, onClose, onT
               <p className="text-xs font-extrabold uppercase tracking-wider text-[#444] mb-3">Chọn loại file xuất</p>
               <div className="space-y-2">
                 {[
-                  { id: 'rirekisho', icon: <FileText size={18} />, label: 'Sơ yếu lý lịch (履歴書)', sub: 'DOCX — Tiếng Nhật' },
-                  { id: 'khai_form', icon: <Table size={18} />, label: 'Khai Form Master', sub: 'XLSX — Khai báo đầy đủ' },
+                  { id: 'rirekisho', icon: <FileText size={18} />, label: 'Sơ yếu lý lịch (履歴書)', sub: 'XLSX — Tiếng Nhật' },
+                  { id: 'tcmmxd_pdf', icon: <FileText size={18} />, label: 'Hồ sơ TCMMXD PDF', sub: 'PDF — 履歴書 Form' },
+                  { id: 'khai_form', icon: <Table size={18} />, label: 'File Master Excel', sub: 'XLSX — Toàn bộ cơ sở dữ liệu' },
+                  { id: 'candidate_form', icon: <Table size={18} />, label: 'Mẫu Tờ Đơn Điền Thông Tin', sub: 'XLSX — Mẫu tờ khai ứng viên' },
                 ].map(t => {
                   const checked = templates.includes(t.id);
                   return (
