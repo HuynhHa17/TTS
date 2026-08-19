@@ -126,6 +126,12 @@ def build_master_sheet(ws, candidates: list, sheet_name: str = None):
     _set_col_widths(ws, _COL_WIDTHS)
     ws.row_dimensions[1].height = 30
 
+    text_keys = {
+        "profile_code", "id_document_number", "id_issue_date", "id_issue_date_jp", 
+        "passport_number", "passport_issue_date", "passport_issue_date_jp", 
+        "date_of_birth", "date_of_birth_jp", "guardian_phone", "phone"
+    }
+
     for row_idx, cand in enumerate(candidates, 2):
         alt = (row_idx % 2 == 0)
         for col_idx, key in enumerate(COL60_KEYS, 1):
@@ -134,7 +140,11 @@ def build_master_sheet(ws, candidates: list, sheet_name: str = None):
                 val = row_idx - 1  # STT
             if val is None:
                 val = ""
-            ws.cell(row=row_idx, column=col_idx, value=val)
+            if key in text_keys and val != "":
+                val = str(val)
+            cell = ws.cell(row=row_idx, column=col_idx, value=val)
+            if key in text_keys:
+                cell.number_format = "@"
         _style_data_row(ws, row_idx, len(COL60_KEYS), alt)
         ws.row_dimensions[row_idx].height = 20
 

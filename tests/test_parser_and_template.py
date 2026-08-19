@@ -159,3 +159,44 @@ class TestTemplateFillerAndRelMapping:
         finally:
             if os.path.exists(out_path):
                 os.remove(out_path)
+
+
+class TestFormTemplateTextFormat:
+    """3. Kiểm tra định dạng Text (@) cho các ô số giấy tờ, CCCD, SĐT"""
+
+    def test_candidate_form_identity_cells_have_text_format(self):
+        from core.form_template import create_candidate_form_workbook
+        wb = create_candidate_form_workbook()
+        ws = wb.active
+
+        # Ô CCCD B11, Passport B12, SĐT F5, SĐT GH F13, Mã HS F8 phải có number_format = "@"
+        assert ws["B11"].number_format == "@"
+        assert ws["B12"].number_format == "@"
+        assert ws["F5"].number_format == "@"
+        assert ws["F8"].number_format == "@"
+        assert ws["F13"].number_format == "@"
+
+    def test_form_parser_reads_integer_identity_number_as_clean_string(self):
+        from core.form_template import create_candidate_form_workbook
+        from core.form_parser import parse_candidate_form_excel
+        wb = create_candidate_form_workbook()
+        ws = wb.active
+
+        ws["B4"] = "NGUYỄN VĂN A"
+        ws["B11"] = 38096001234  # integer or float from Excel without losing digits
+        ws["B12"] = "C1234567"
+
+        with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
+            tmp_path = tmp.name
+
+        try:
+            wb.save(tmp_path)
+            res = parse_candidate_form_excel(tmp_path)
+            identity_docs = res["identityDocuments"]
+            cccd_doc = next((d for d in identity_docs if d.get("document_type") == "CCCD" or d.get("doc_type") == "CCCD"), None)
+            assert cccd_doc is not None
+            assert cccd_doc["document_number"] == "38096001234"
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+

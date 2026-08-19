@@ -24,18 +24,38 @@ def create_candidate_form_workbook() -> openpyxl.Workbook:
     ws = wb.active
     ws.title = "To_Khai_Ung_Vien"
 
-    # Setup page margins
+    # ── Setup Page Setup for Standard A4 (1 Page Single Sheet) ──
     ws.page_setup.orientation = ws.ORIENTATION_PORTRAIT
-    ws.page_setup.paperSize = ws.PAPERSIZE_A4
+    ws.page_setup.paperSize = ws.PAPERSIZE_A4  # A4 standard (210 x 297 mm)
+    ws.sheet_properties.pageSetUpPr.fitToPage = True
+    ws.page_setup.fitToWidth = 1
+    ws.page_setup.fitToHeight = 1
+
+    # Margins (inches) - Compact & balanced for A4
+    ws.page_margins.left = 0.3
+    ws.page_margins.right = 0.3
+    ws.page_margins.top = 0.4
+    ws.page_margins.bottom = 0.4
+    ws.page_margins.header = 0.2
+    ws.page_margins.footer = 0.2
+
+    # Centered horizontally on A4 page
+    ws.print_options.horizontalCentered = True
+    ws.print_options.verticalCentered = False
+
+    # Show grid lines
     ws.views.sheetView[0].showGridLines = True
 
+    # Print Area
+    ws.print_area = "A1:H46"
+
     # ── Style Definitions ──
-    font_title = Font(name="Arial", size=14, bold=True, color="FFFFFF")
-    font_sub_title = Font(name="Arial", size=9, italic=True, color="DDE2E5")
-    font_sec_hdr = Font(name="Arial", size=10, bold=True, color="FFFFFF")
-    font_lbl = Font(name="Arial", size=9, bold=True, color="1A1A1A")
-    font_inp = Font(name="Arial", size=10, bold=False, color="002060")
-    font_guide = Font(name="Arial", size=8, italic=True, color="888888")
+    font_title = Font(name="Times New Roman", size=13, bold=True, color="FFFFFF")
+    font_sub_title = Font(name="Times New Roman", size=8.5, italic=True, color="DDE2E5")
+    font_sec_hdr = Font(name="Times New Roman", size=9.5, bold=True, color="FFFFFF")
+    font_lbl = Font(name="Times New Roman", size=8.5, bold=True, color="1A1A1A")
+    font_inp = Font(name="Times New Roman", size=9.5, bold=False, color="002060")
+    font_guide = Font(name="Times New Roman", size=8, italic=True, color="888888")
 
     fill_title = PatternFill(start_color="1E3A5F", end_color="1E3A5F", fill_type="solid")
     fill_sec_hdr = PatternFill(start_color="2B4C7E", end_color="2B4C7E", fill_type="solid")
@@ -49,34 +69,36 @@ def create_candidate_form_workbook() -> openpyxl.Workbook:
     align_center = Alignment(horizontal="center", vertical="center", wrap_text=True)
     align_left = Alignment(horizontal="left", vertical="center", wrap_text=True)
 
-    # Column widths (Total 8 columns A..H)
+    # Column widths optimized for A4 printable width (Total ~110 units)
     col_widths = {
-        "A": 16,  # Nhãn 1
-        "B": 24,  # Giá trị 1
-        "C": 14,  # Nhãn 2
-        "D": 22,  # Giá trị 2
-        "E": 14,  # Nhãn 3
-        "F": 22,  # Giá trị 3
-        "G": 14,  # Nhãn 4
-        "H": 22,  # Giá trị 4
+        "A": 14,  # Nhãn 1
+        "B": 18,  # Giá trị 1
+        "C": 12,  # Nhãn 2
+        "D": 15,  # Giá trị 2
+        "E": 12,  # Nhãn 3
+        "F": 16,  # Giá trị 3
+        "G": 12,  # Nhãn 4
+        "H": 15,  # Giá trị 4
     }
     for col, width in col_widths.items():
         ws.column_dimensions[col].width = width
 
-    def style_range(cell_range, fill=None, font=None, alignment=None, border=border_cell):
+    def style_range(cell_range, fill=None, font=None, alignment=None, border=border_cell, number_format=None):
         for row in ws[cell_range]:
             for cell in row:
                 if fill: cell.fill = fill
                 if font: cell.font = font
                 if alignment: cell.alignment = alignment
                 if border: cell.border = border
+                if number_format: cell.number_format = number_format
 
-    def set_cell(coord, val, fill=fill_inp, font=font_inp, alignment=align_left, **kwargs):
+    def set_cell(coord, val, fill=fill_inp, font=font_inp, alignment=align_left, number_format="@", **kwargs):
         c = ws[coord]
         c.value = val
         if fill: c.fill = fill
         if font: c.font = font
         if alignment: c.alignment = alignment
+        if number_format: c.number_format = number_format
         c.border = border_cell
 
     def set_label(coord, val, fill=fill_lbl, font=font_lbl, alignment=align_left, **kwargs):
@@ -148,18 +170,18 @@ def create_candidate_form_workbook() -> openpyxl.Workbook:
     # Row 8: Nơi sinh & Mã hồ sơ
     set_label("A8", "Nơi sinh (Tỉnh/TP) *")
     ws.merge_cells("B8:D8")
-    style_range("B8:D8", fill=fill_inp, font=font_inp, alignment=align_left)
+    style_range("B8:D8", fill=fill_inp, font=font_inp, alignment=align_left, number_format="@")
     ws["B8"] = ""
 
     set_label("E8", "Mã hồ sơ (Nếu có)")
     ws.merge_cells("F8:H8")
-    style_range("F8:H8", fill=fill_inp, font=font_inp, alignment=align_left)
+    style_range("F8:H8", fill=fill_inp, font=font_inp, alignment=align_left, number_format="@")
     ws["F8"] = ""
 
     # Row 9: Địa chỉ thường trú
     set_label("A9", "Địa chỉ thường trú *")
     ws.merge_cells("B9:H9")
-    style_range("B9:H9", fill=fill_inp, font=font_inp, alignment=align_left)
+    style_range("B9:H9", fill=fill_inp, font=font_inp, alignment=align_left, number_format="@")
     ws["B9"] = ""
 
     for r in range(4, 10):
@@ -175,22 +197,22 @@ def create_candidate_form_workbook() -> openpyxl.Workbook:
 
     # CCCD (Row 11)
     set_label("A11", "Số CCCD / CMND *")
-    set_cell("B11", "")
+    set_cell("B11", "", number_format="@")
     set_label("C11", "Ngày cấp CCCD")
-    set_cell("D11", "")
+    set_cell("D11", "", number_format="@")
     set_label("E11", "Nơi cấp CCCD")
     ws.merge_cells("F11:H11")
-    style_range("F11:H11", fill=fill_inp, font=font_inp, alignment=align_left)
+    style_range("F11:H11", fill=fill_inp, font=font_inp, alignment=align_left, number_format="@")
     ws["F11"] = "Cục Cảnh sát QLHC về TTXH"
 
     # Passport (Row 12)
     set_label("A12", "Số Hộ chiếu (Passport)")
-    set_cell("B12", "")
+    set_cell("B12", "", number_format="@")
     set_label("C12", "Ngày cấp Hộ chiếu")
-    set_cell("D12", "")
+    set_cell("D12", "", number_format="@")
     set_label("E12", "Nơi cấp Hộ chiếu")
     ws.merge_cells("F12:H12")
-    style_range("F12:H12", fill=fill_inp, font=font_inp, alignment=align_left)
+    style_range("F12:H12", fill=fill_inp, font=font_inp, alignment=align_left, number_format="@")
     ws["F12"] = "Cục Quản lý xuất nhập cảnh"
 
     # Người giám hộ (Row 13 - 14)
@@ -200,12 +222,12 @@ def create_candidate_form_workbook() -> openpyxl.Workbook:
     set_cell("D13", "Bố")
     set_label("E13", "Số điện thoại GH *")
     ws.merge_cells("F13:H13")
-    style_range("F13:H13", fill=fill_inp, font=font_inp, alignment=align_left)
+    style_range("F13:H13", fill=fill_inp, font=font_inp, alignment=align_left, number_format="@")
     ws["F13"] = ""
 
     set_label("A14", "Địa chỉ người giám hộ")
     ws.merge_cells("B14:H14")
-    style_range("B14:H14", fill=fill_inp, font=font_inp, alignment=align_left)
+    style_range("B14:H14", fill=fill_inp, font=font_inp, alignment=align_left, number_format="@")
     ws["B14"] = ""
 
     for r in range(11, 15):
@@ -259,22 +281,22 @@ def create_candidate_form_workbook() -> openpyxl.Workbook:
 
     set_label("A20", "Ngành nghề đăng ký")
     ws.merge_cells("B20:D20")
-    style_range("B20:D20", fill=fill_inp, font=font_inp, alignment=align_left)
+    style_range("B20:D20", fill=fill_inp, font=font_inp, alignment=align_left, number_format="@")
     ws["B20"] = "Thi công máy móc xây dựng"
 
     set_label("E20", "Thời gian kinh nghiệm")
     ws.merge_cells("F20:H20")
-    style_range("F20:H20", fill=fill_inp, font=font_inp, alignment=align_left)
+    style_range("F20:H20", fill=fill_inp, font=font_inp, alignment=align_left, number_format="@")
     ws["F20"] = "2 năm"
 
     set_label("A21", "Mục đích sang Nhật")
     ws.merge_cells("B21:H21")
-    style_range("B21:H21", fill=fill_inp, font=font_inp, alignment=align_left)
+    style_range("B21:H21", fill=fill_inp, font=font_inp, alignment=align_left, number_format="@")
     ws["B21"] = "Học hỏi kỹ thuật tiên tiến và tích lũy vốn phát triển tương lai"
 
     set_label("A22", "Kế hoạch sau về nước")
     ws.merge_cells("B22:H22")
-    style_range("B22:H22", fill=fill_inp, font=font_inp, alignment=align_left)
+    style_range("B22:H22", fill=fill_inp, font=font_inp, alignment=align_left, number_format="@")
     ws["B22"] = "Làm việc tại doanh nghiệp Nhật Bản tại Việt Nam"
 
     set_label("A23", "Ưu điểm")
@@ -283,7 +305,7 @@ def create_candidate_form_workbook() -> openpyxl.Workbook:
     set_cell("D23", "Ít nói")
     set_label("E23", "Sở thích")
     ws.merge_cells("F23:H23")
-    style_range("F23:H23", fill=fill_inp, font=font_inp, alignment=align_left)
+    style_range("F23:H23", fill=fill_inp, font=font_inp, alignment=align_left, number_format="@")
     ws["F23"] = "Thể thao, đọc sách"
 
     for r in range(20, 24):
@@ -316,9 +338,9 @@ def create_candidate_form_workbook() -> openpyxl.Workbook:
         set_cell(f"B{r}", "")
         set_cell(f"C{r}", "")
         ws.merge_cells(f"D{r}:F{r}")
-        style_range(f"D{r}:F{r}", fill=fill_inp, font=font_inp, alignment=align_left)
+        style_range(f"D{r}:F{r}", fill=fill_inp, font=font_inp, alignment=align_left, number_format="@")
         ws.merge_cells(f"G{r}:H{r}")
-        style_range(f"G{r}:H{r}", fill=fill_inp, font=font_inp, alignment=align_left)
+        style_range(f"G{r}:H{r}", fill=fill_inp, font=font_inp, alignment=align_left, number_format="@")
         ws[f"G{r}"] = default_edus[i-1] if i <= len(default_edus) else ""
 
     # ══════════════════════════════════════════════════════════════════════════
@@ -347,9 +369,9 @@ def create_candidate_form_workbook() -> openpyxl.Workbook:
         set_cell(f"B{r}", "")
         set_cell(f"C{r}", "")
         ws.merge_cells(f"D{r}:E{r}")
-        style_range(f"D{r}:E{r}", fill=fill_inp, font=font_inp, alignment=align_left)
+        style_range(f"D{r}:E{r}", fill=fill_inp, font=font_inp, alignment=align_left, number_format="@")
         ws.merge_cells(f"F{r}:H{r}")
-        style_range(f"F{r}:H{r}", fill=fill_inp, font=font_inp, alignment=align_left)
+        style_range(f"F{r}:H{r}", fill=fill_inp, font=font_inp, alignment=align_left, number_format="@")
 
     # ══════════════════════════════════════════════════════════════════════════
     # SECTION VII: THÀNH VIÊN GIA ĐÌNH / THÂN NHÂN (Rows 36 - 42)
@@ -377,7 +399,7 @@ def create_candidate_form_workbook() -> openpyxl.Workbook:
         set_cell(f"A{r}", str(i), alignment=align_center)
         set_cell(f"B{r}", default_rels[i-1] if i <= len(default_rels) else "")
         ws.merge_cells(f"C{r}:D{r}")
-        style_range(f"C{r}:D{r}", fill=fill_inp, font=font_inp, alignment=align_left)
+        style_range(f"C{r}:D{r}", fill=fill_inp, font=font_inp, alignment=align_left, number_format="@")
         set_cell(f"E{r}", "")
         set_cell(f"F{r}", "")
         set_cell(f"G{r}", "")
@@ -388,16 +410,16 @@ def create_candidate_form_workbook() -> openpyxl.Workbook:
     # ══════════════════════════════════════════════════════════════════════════
     ws.merge_cells("A43:H43")
     ws["A43"] = "Tôi xin cam đoan những thông tin khai trên đây là hoàn toàn đúng sự thật."
-    style_range("A43:H43", font=Font(name="Arial", size=9, italic=True, bold=True), alignment=align_center)
+    style_range("A43:H43", font=Font(name="Times New Roman", size=9, italic=True, bold=True), alignment=align_center)
     ws.row_dimensions[43].height = 20
 
     ws.merge_cells("F44:H44")
     ws["F44"] = "Ngày ...... tháng ...... năm 202..."
-    style_range("F44:H44", font=Font(name="Arial", size=9, italic=True), alignment=align_center)
+    style_range("F44:H44", font=Font(name="Times New Roman", size=9, italic=True), alignment=align_center)
 
     ws.merge_cells("F45:H45")
     ws["F45"] = "Người làm đơn (Ký và ghi rõ họ tên)"
-    style_range("F45:H45", font=Font(name="Arial", size=9, bold=True), alignment=align_center)
+    style_range("F45:H45", font=Font(name="Times New Roman", size=9, bold=True), alignment=align_center)
 
     ws.row_dimensions[46].height = 40  # signature space
 

@@ -547,10 +547,13 @@ def export_to_excel():
             ws.column_dimensions[cell.column_letter].width = 20
 
         # Data rows
+        text_cols = {2, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 29, 60}
         for stt, c in enumerate(candidates, start=1):
             row_data = _candidate_to_row(c, stt)
             for col_idx, val in enumerate(row_data, start=1):
-                ws.cell(row=stt + 1, column=col_idx, value=val)
+                cell = ws.cell(row=stt + 1, column=col_idx, value=val)
+                if col_idx in text_cols:
+                    cell.number_format = "@"
 
         wb.save(path)
         return jsonify({

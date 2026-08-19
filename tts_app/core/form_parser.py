@@ -47,6 +47,12 @@ def _get_val(cell):
     val = cell.value
     if isinstance(val, (datetime, date)):
         return val.strftime("%d/%m/%Y")
+    if isinstance(val, float):
+        if val.is_integer():
+            return str(int(val)).strip()
+        return str(val).strip()
+    if isinstance(val, int):
+        return str(val).strip()
     return str(val).strip()
 
 
@@ -236,17 +242,21 @@ def parse_candidate_form_excel(file_bytes_or_path) -> dict:
     identity_docs = []
     if cccd_num:
         identity_docs.append({
+            "document_type": "CCCD",
             "doc_type": "CCCD",
             "document_number": cccd_num,
             "issue_date": cccd_date,
+            "issue_place_vn": cccd_place or "Cục Cảnh sát QLHC về TTXH",
             "issue_place": cccd_place or "Cục Cảnh sát QLHC về TTXH",
             "is_primary": True,
         })
     if passport_num:
         identity_docs.append({
-            "doc_type": "PASSPORT",
+            "document_type": "Passport",
+            "doc_type": "Passport",
             "document_number": passport_num,
             "issue_date": passport_date,
+            "issue_place_vn": passport_place or "Cục Quản lý xuất nhập cảnh",
             "issue_place": passport_place or "Cục Quản lý xuất nhập cảnh",
             "is_primary": False,
         })
@@ -254,27 +264,44 @@ def parse_candidate_form_excel(file_bytes_or_path) -> dict:
     candidate_dict = {
         "full_name_vn": full_name_vn,
         "full_name_katakana": full_name_katakana or None,
+        "full_name_eng": full_name_en or None,
         "date_of_birth": date_of_birth,
         "gender": gender,
         "phone": phone or None,
         "marital_status": marital_status,
+        "has_children": has_children or "Không",
+        "foreign_languages": language_skill or None,
+        "nationality": nationality,
+        "ethnicity": ethnicity,
+        "mother_tongue": native_language,
         "birthplace_vn": birthplace_vn or None,
         "address_vn": address_vn or None,
+        "guardian_name_vn": guardian_name or None,
         "guardian_name": guardian_name or None,
         "guardian_relationship": guardian_rel or None,
-        "guardian_phone": guardian_phone or None,
+        "guardian_address_vn": guardian_addr or None,
         "guardian_address": guardian_addr or None,
+        "guardian_phone": guardian_phone or None,
         "height_cm": height_cm,
         "weight_kg": weight_kg,
         "blood_type": blood_type,
         "vision_left": vision_left or None,
         "vision_right": vision_right or None,
+        "preferred_hand": dominant_hand,
         "dominant_hand": dominant_hand,
+        "tattoos": tattoo or "Không",
         "tattoo": tattoo or "Không",
+        "smoking": smoking or "Không",
+        "alcohol": drinking or "Không",
+        "health_status": health_status or "Tốt",
+        "chronic_disease": chronic_disease or "Không",
+        "purpose_to_japan_vn": japan_goal or None,
+        "japan_goal_vn": japan_goal or None,
+        "plan_after_return_vn": post_return_plan or None,
         "strengths_vn": strengths or None,
         "weaknesses_vn": weaknesses or None,
+        "hobbies_vn": hobbies or None,
         "hobby_vn": hobbies or None,
-        "japan_goal_vn": japan_goal or None,
         "profile_code": profile_code or None,
     }
 
@@ -290,3 +317,4 @@ def parse_candidate_form_excel(file_bytes_or_path) -> dict:
         "familyMembers": family_members,
         "assignment": assignment_dict,
     }
+
