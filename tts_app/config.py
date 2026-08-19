@@ -9,7 +9,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(BASE_DIR)
 
 # File paths
-CV_FILE       = os.path.join(ROOT_DIR, "CVpv.xlsx")
+CV_FILE       = os.path.join(ROOT_DIR, "TTS-Rirekisho Form.xlsx")
 OUTPUT_FILE   = os.path.join(ROOT_DIR, "File_lưu.xlsx")
 DATA_DIR      = os.path.join(BASE_DIR, "data")
 DB_PATH       = os.path.join(DATA_DIR, "tts_master_v2.db")

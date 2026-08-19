@@ -189,27 +189,27 @@ def _generate(api_key: str, prompt: str) -> str:
 TRANSLATE_PROMPT = """Ban la chuyen gia dich thuat ho so thuc tap sinh (TTS) Viet Nam sang tieng Nhat va tieng Anh.
 Hay dich TOAN BO cac truong thong tin duoc cung cap trong JSON dau vao, khong bo sot bat ky truong nao:
 
-Quy tac dich:
+QUY TAC DICH QUAN TRONG:
 - ten_vnm (ten ung vien): Chuyen sang "ten_phien_am" (Katakana chuan, VD: グエン ヴァン アー) va "ten_tieng_anh" (chu in hoa khong dau, VD: NGUYEN VAN A)
-- dia_chi_vnm: Dich sang "dia_chi_jpn" (tieng Nhat tu nhien, giu nguyen dia danh)
-- noi_sinh_vnm: Dich sang "noi_sinh_jpn" (ten tinh/thanh pho sang tieng Nhat)
-- noi_cap_cccd_vnm, noi_cap_hc_vnm: Dich sang "noi_cap_cccd_jpn", "noi_cap_hc_jpn" (tieng Nhat)
-- nguoi_giam_ho_vnm: Dich sang "nguoi_giam_ho_en" (tieng Anh viet hoa khong dau kem quan he, VD: "NGUYEN VAN B (FATHER)") va "nguoi_giam_ho_jpn" (Katakana/tieng Nhat)
-- nghe_giam_ho_vnm: Dich sang "nghe_giam_ho_en" (tieng Anh, VD: "Farmer", "Housewife", "Worker") va "nghe_giam_ho_jpn" (tieng Nhat, VD: "農業", "主婦", "会社員")
-- dc_nguoi_gh_vnm: Dich sang "dc_nguoi_gh_jpn" (dia chi tieng Nhat)
-- nganh_nghe_vnm: Dich sang "nganh_nghe_jpn" (nganh nghe TTS sang tieng Nhat)
+- dia_chi_vnm: Dich sang "dia_chi_jpn" (KHONG phien am ten dia danh sang Katakana, giu TEN RIENG DIA DANH BANG CHU LATIN KHONG DAU kem don vi hanh chinh tieng Nhat nhu 省, 県, 市, 社, 村, 坊, 郡. VD: "Đức Minh, Đăk Mil, Đắk Nông" -> "Dak Nong省、Dak Mil県、Duc Minh社。" hoac "Duc Minh社、Dak Mil県、Dak Nong省。")
+- noi_sinh_vnm: Dich sang "noi_sinh_jpn" (giu ten tinh/thanh pho bang chu LATIN KHONG DAU kem 省/市, VD: "Đắk Nông" -> "Dak Nong省", "Hà Tĩnh" -> "Ha Tinh省", "Hà Nội" -> "Ha Noi市", "Hải Phòng" -> "Hai Phong市")
+- noi_cap_cccd_vnm, noi_cap_hc_vnm: Dich sang "noi_cap_cccd_jpn", "noi_cap_hc_jpn" (tieng Nhat, VD: "ベトナム社会秩序行政管理警察局", "ベトナム出入国管理局")
+- nguoi_giam_ho_vnm: Dich sang "nguoi_giam_ho_jpn" (Ten Latin in hoa khong dau kem quan he bang tieng Nhat trong ngoac, VD: "Pham Trong Hung (Bo)" -> "PHAM TRONG HUNG (父)")
+- nghe_giam_ho_vnm: Dich sang "nghe_giam_ho_jpn" (tieng Nhat, VD: "農業", "主婦", "会社員", "自営業", "縫製工")
+- dc_nguoi_gh_vnm: Dich sang "dc_nguoi_gh_jpn" (giu ten dia danh bang chu LATIN KHONG DAU kem don vi hanh chinh tieng Nhat 省, 県, 社,...)
+- nganh_nghe_vnm: Dich sang "nganh_nghe_jpn" (nganh nghe TTS sang tieng Nhat, VD: "建設機械施工", "溶接", "農業")
 - kn_tom_tat_vnm: Dich sang "kn_tom_tat_jpn" (VD: "3 năm" -> "３年")
 - muc_dich_vnm: Dich sang "muc_dich_jpn" (muc dich sang Nhat bang tieng Nhat)
 - ke_hoach_vnm: Dich sang "ke_hoach_jpn" (ke hoach sau khi ve nuoc bang tieng Nhat)
 - diem_manh_vnm: Dich sang "diem_manh_jpn" (tieng Nhat)
 - diem_yeu_vnm: Dich sang "diem_yeu_jpn" (tieng Nhat)
 - so_thich_vnm: Dich sang "so_thich_jpn" (tieng Nhat)
-- ten_truong_X: Dich sang "ten_truong_X_jpn" (ten truong hoc sang tieng Nhat)
-- ten_dn_X: Dich sang "ten_dn_X_jpn" (ten cong ty/doanh nghiep sang tieng Nhat)
-- chuc_vu_X: Dich sang "chuc_vu_X_jpn" (chuc vu/nghe nghiep sang tieng Nhat)
+- ten_truong_X: Dich sang "ten_truong_X_jpn" (KHONG phien am ten rieng sang Katakana, giu TEN RIENG BANG CHU LATIN KHONG DAU kem loai truong nhu 高校, 中学校, 大学, 短期大学, VD: "THPT Ngô Quyền" -> "Ngo Quyen高校", "THPT Trần Phú" -> "Tran Phu高校", "THCS Lê Lợi" -> "Le Loi中学校", "Đại học Bách Khoa Hà Nội" -> "Hanoi Bach Khoa大学")
+- ten_dn_X: Dich sang "ten_dn_X_jpn" (KHONG phien am ten rieng sang Katakana, giu TEN RIENG BANG CHU LATIN KHONG DAU kem loai hinh cong ty/nganh nghe bang tieng Nhat hoac Latin, VD: "Công ty Cổ phần May Sông Hồng" -> "Song Hong縫製株式会社", "Công ty Cơ khí Hải Phòng" -> "Hai Phong機械会社", "Công ty TNHH Hoàng Long" -> "Hoang Long有限会社")
+- chuc_vu_X: Dich sang "chuc_vu_X_jpn" (chuc vu/nghe nghiep sang tieng Nhat, VD: "Thợ may" -> "縫製工", "Công nhân" -> "会社員", "Thợ hàn" -> "溶接工")
 - ky_nang_X: Dich sang "ky_nang_X_jpn" (ten ky nang nghe sang tieng Nhat)
-- tv_ten_X: Dich sang "tv_ten_X_en" (ten nguoi than tieng Anh in hoa khong dau)
-- tv_nghe_X: Dich sang "tv_nghe_X_en" (nghe nghiep nguoi than tieng Anh) va "tv_nghe_X_jpn" (nghe nghiep nguoi than tieng Nhat)
+- tv_ten_X: Dich sang "tv_ten_X_en" (ten nguoi than bang chu LATIN IN HOA KHONG DAU, VD: "PHAM TRONG HUNG")
+- tv_nghe_X: Dich sang "tv_nghe_X_jpn" (nghe nghiep nguoi than sang tieng Nhat, VD: "農業", "主婦", "会社員", "学生")
 - custom_X: Dich gia tri truong tuy chinh sang tieng Nhat "custom_X_jpn"
 
 Dau vao (JSON):
@@ -427,14 +427,67 @@ Chi tra ve ten nghe nghiep bang tieng Nhat, khong giai thich."""
     if not api_key:
         raise ValueError("Chưa cấu hình Gemini API Key. Vào tab Cài Đặt để nhập.")
 
+    # School name translation (Keep proper noun in Latin without accents + JP level)
+    if any(k in fn_lower for k in ("ten_truong", "school_name", "school", "truong")):
+        prompt = f"""Dich ten truong hoc sau sang tieng Nhat cho ho so TTS:
+Gia tri: {val_strip}
+
+QUY TAC:
+- KHONG phien am ten rieng sang Katakana.
+- Giu TEN RIENG BANG CHU LATIN KHONG DAU kem loai truong nhu 高校, 中学校, 大学, 短期大学.
+Vi du:
+- "THPT Ngô Quyền" -> "Ngo Quyen高校"
+- "THPT Trần Phú" -> "Tran Phu高校"
+- "THCS Lê Lợi" -> "Le Loi中学校"
+- "Tiểu học Kim Đồng" -> "Kim Dong小学校"
+- "Đại học Bách Khoa Hà Nội" -> "Hanoi Bach Khoa大学"
+- "Cao đẳng Nghề Đà Nẵng" -> "Da Nang職業短期大学"
+
+Chi tra ve ten truong hoc, khong giai thich."""
+        return _generate(api_key, prompt)
+
+    # Company name translation (Keep proper noun in Latin without accents + JP company type)
+    if any(k in fn_lower for k in ("ten_dn", "company_name", "company", "cong_ty", "doanh_nghiep")):
+        prompt = f"""Dich ten cong ty/doanh nghiep sau sang tieng Nhat cho ho so TTS:
+Gia tri: {val_strip}
+
+QUY TAC:
+- KHONG phien am ten rieng sang Katakana.
+- Giu TEN RIENG BANG CHU LATIN KHONG DAU kem loai hinh cong ty/nganh nghe bang tieng Nhat.
+Vi du:
+- "Công ty Cổ phần May Sông Hồng" -> "Song Hong縫製株式会社"
+- "Công ty Cơ khí Hải Phòng" -> "Hai Phong機械会社"
+- "Công ty TNHH Hoàng Long" -> "Hoang Long有限会社"
+- "Xí nghiệp May Hải Dương" -> "Hai Duong縫製工場"
+
+Chi tra ve ten cong ty, khong giai thich."""
+        return _generate(api_key, prompt)
+
+    # Address / Birthplace translation (Keep proper place names in Latin without accents + JP administrative units)
+    if any(k in fn_lower for k in ("dia_chi", "address", "noi_sinh", "birthplace", "dc_nguoi_gh", "noi_cap")):
+        prompt = f"""Dich dia chi / noi sinh sau sang tieng Nhat cho ho so TTS:
+Gia tri: {val_strip}
+
+QUY TAC:
+- KHONG phien am ten dia danh rieng sang Katakana.
+- Giu TEN RIENG DIA DANH BANG CHU LATIN KHONG DAU kem don vi hanh chinh tieng Nhat nhu 省, 県, 市, 社, 村, 坊, 郡.
+Vi du:
+- "Đức Minh, Đăk Mil, Đắk Nông" -> "Dak Nong省、Dak Mil県、Duc Minh社。"
+- "Đắk Nông" -> "Dak Nong省"
+- "Hà Tĩnh" -> "Ha Tinh省"
+- "Hà Nội" -> "Ha Noi市"
+- "Hải Phòng" -> "Hai Phong市"
+
+Chi tra ve dia chi / dia danh, khong giai thich."""
+        return _generate(api_key, prompt)
+
     prompt = f"""Dich gia tri sau sang tieng Nhat cho ho so TTS:
 Truong: {field_name}
 Gia tri: {val_strip}
 
 Quy tac:
 - Ten nguoi -> Katakana
-- Dia chi -> tieng Nhat tu nhien
-- Ten to chuc -> phien am hoac dich
+- Ten rieng dia danh, truong hoc, cong ty -> giu chu LATIN KHONG DAU kem tu tieng Nhat tuong ung (省, 市, 高校, 会社)
 - Quan he gia dinh: Cha->父, Me->母, Anh->兄, Chi->姉, Em trai->弟, Em gai->妹, Vo->妻, Chong->夫
 
 Chi tra ve ban dich, khong giai thich."""

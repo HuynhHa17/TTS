@@ -51,6 +51,15 @@ class TestImportCVEndpoints:
         assert data["count"] >= 0
 
     def test_confirm_cv_import_with_child_records(self, client):
+        # Dọn dẹp dữ liệu test cũ nếu có
+        db_cleanup = get_session()
+        try:
+            for old in db_cleanup.query(Candidate).filter(Candidate.profile_code.in_(["TTS-TEST-CV1", "TTS-TEST-CV1-1"])).all():
+                db_cleanup.delete(old)
+            db_cleanup.commit()
+        finally:
+            db_cleanup.close()
+
         records = [
             {
                 "profile_code": "TTS-TEST-CV1",

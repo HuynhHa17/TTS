@@ -38,6 +38,10 @@ def _get_template_path(db=None):
 
     candidates_paths.extend([
         config.CV_FILE,
+        os.path.join(config.ROOT_DIR, "TTS-Rirekisho Form.xlsx"),
+        os.path.join(config.BASE_DIR, "..", "TTS-Rirekisho Form.xlsx"),
+        os.path.join(config.BASE_DIR, "TTS-Rirekisho Form.xlsx"),
+        os.path.join(config.DATA_DIR, "TTS-Rirekisho Form.xlsx"),
         os.path.join(config.ROOT_DIR, "CVpv.xlsx"),
         os.path.join(config.BASE_DIR, "..", "CVpv.xlsx"),
         os.path.join(config.BASE_DIR, "CVpv.xlsx"),
