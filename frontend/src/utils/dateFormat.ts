@@ -115,12 +115,25 @@ export function removeVietnameseAccents(text: string | null | undefined): string
 }
 
 export const OFFLINE_REL_MAP: Record<string, string> = {
-  'bố': 'FATHER', 'cha': 'FATHER', 'ba': 'FATHER', 'bố đẻ': 'FATHER',
-  'mẹ': 'MOTHER', 'má': 'MOTHER', 'mẹ đẻ': 'MOTHER',
-  'anh': 'BROTHER', 'anh trai': 'ELDER BROTHER', 'em trai': 'YOUNGER BROTHER',
-  'chị': 'SISTER', 'chị gái': 'ELDER SISTER', 'em gái': 'YOUNGER SISTER',
+  'bố': 'FATHER', 'cha': 'FATHER', 'ba': 'FATHER', 'bố đẻ': 'FATHER', 'cha đẻ': 'FATHER',
+  'mẹ': 'MOTHER', 'má': 'MOTHER', 'mẹ đẻ': 'MOTHER', 'má đẻ': 'MOTHER',
+  'anh': 'BROTHER', 'anh trai': 'ELDER BROTHER', 'anh ruột': 'ELDER BROTHER', 'em trai': 'YOUNGER BROTHER', 'em trai ruột': 'YOUNGER BROTHER',
+  'chị': 'SISTER', 'chị gái': 'ELDER SISTER', 'chị ruột': 'ELDER SISTER', 'em gái': 'YOUNGER SISTER', 'em gái ruột': 'YOUNGER SISTER',
   'vợ': 'WIFE', 'chồng': 'HUSBAND', 'con': 'CHILD', 'con trai': 'SON', 'con gái': 'DAUGHTER',
-  'ông': 'GRANDFATHER', 'bà': 'GRANDMOTHER', 'chú': 'UNCLE', 'bác': 'UNCLE', 'cô': 'AUNT', 'dì': 'AUNT',
+  'ông': 'GRANDFATHER', 'ông nội': 'GRANDFATHER', 'ông ngoại': 'GRANDFATHER',
+  'bà': 'GRANDMOTHER', 'bà nội': 'GRANDMOTHER', 'bà ngoại': 'GRANDMOTHER',
+  'chú': 'UNCLE', 'bác': 'UNCLE', 'cậu': 'UNCLE', 'cô': 'AUNT', 'dì': 'AUNT', 'mợ': 'AUNT', 'thím': 'AUNT',
+};
+
+export const OFFLINE_REL_MAP_JP: Record<string, string> = {
+  'bố': '父', 'cha': '父', 'ba': '父', 'bố đẻ': '父', 'cha đẻ': '父',
+  'mẹ': '母', 'má': '母', 'mẹ đẻ': '母', 'má đẻ': '母',
+  'anh': '兄', 'anh trai': '兄', 'anh ruột': '兄', 'em trai': '弟', 'em trai ruột': '弟',
+  'chị': '姉', 'chị gái': '姉', 'chị ruột': '姉', 'em gái': '妹', 'em gái ruột': '妹',
+  'vợ': '妻', 'chồng': '夫', 'con': '子', 'con trai': '長男', 'con gái': '長女',
+  'ông': '祖父', 'ông nội': '祖父', 'ông ngoại': '祖父',
+  'bà': '祖母', 'bà nội': '祖母', 'bà ngoại': '祖母',
+  'chú': '叔父', 'bác': '伯父', 'cậu': '叔父', 'cô': '叔母', 'dì': '叔母', 'mợ': '叔母', 'thím': '叔母',
 };
 
 export const OFFLINE_JOBS_EN: Record<string, string> = {
@@ -157,16 +170,48 @@ export const OFFLINE_JOBS_JP: Record<string, string> = {
   'đầu bếp': '調理師', 'bảo vệ': '警備員',
 };
 
+export function translateGuardianNameJpOffline(val: string | null | undefined): string {
+  if (!val) return '';
+  const s = String(val).trim();
+  const m = s.match(/^(.*?)\s*[\(\[\{（]\s*(.+?)\s*[\)\]\}）]\s*$/);
+  if (m) {
+    const namePart = m[1].trim();
+    const relPart = m[2].trim().toLowerCase();
+    const noAccentName = removeVietnameseAccents(namePart).toUpperCase();
+    const relJp = OFFLINE_REL_MAP_JP[relPart] || removeVietnameseAccents(relPart).toUpperCase();
+    return `${noAccentName} (${relJp})`;
+  }
+  const m2 = s.match(/^(.*?)\s*[-/]\s*(.+?)$/);
+  if (m2) {
+    const namePart = m2[1].trim();
+    const relPart = m2[2].trim().toLowerCase();
+    if (relPart in OFFLINE_REL_MAP_JP) {
+      const noAccentName = removeVietnameseAccents(namePart).toUpperCase();
+      return `${noAccentName} (${OFFLINE_REL_MAP_JP[relPart]})`;
+    }
+  }
+  return removeVietnameseAccents(s).toUpperCase();
+}
+
 export function translateGuardianNameOffline(val: string | null | undefined): string {
   if (!val) return '';
   const s = String(val).trim();
-  const m = s.match(/^(.*?)\s*[\(\[\{](.+?)[\)\]\}]\s*$/);
+  const m = s.match(/^(.*?)\s*[\(\[\{（]\s*(.+?)\s*[\)\]\}）]\s*$/);
   if (m) {
     const namePart = m[1].trim();
     const relPart = m[2].trim().toLowerCase();
     const noAccentName = removeVietnameseAccents(namePart).toUpperCase();
     const relEn = OFFLINE_REL_MAP[relPart] || removeVietnameseAccents(relPart).toUpperCase();
     return `${noAccentName} (${relEn})`;
+  }
+  const m2 = s.match(/^(.*?)\s*[-/]\s*(.+?)$/);
+  if (m2) {
+    const namePart = m2[1].trim();
+    const relPart = m2[2].trim().toLowerCase();
+    if (relPart in OFFLINE_REL_MAP) {
+      const noAccentName = removeVietnameseAccents(namePart).toUpperCase();
+      return `${noAccentName} (${OFFLINE_REL_MAP[relPart]})`;
+    }
   }
   return removeVietnameseAccents(s).toUpperCase();
 }

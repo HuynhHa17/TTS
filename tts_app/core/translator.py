@@ -30,14 +30,29 @@ CANDIDATE_MODELS = [
 
 # Offline dictionaries
 OFFLINE_REL_EN = {
-    "cha": "FATHER", "bo": "FATHER", "bố": "FATHER", "ba": "FATHER", "bo de": "FATHER", "bố đẻ": "FATHER",
-    "me": "MOTHER", "mẹ": "MOTHER", "ma": "MOTHER", "má": "MOTHER", "me de": "MOTHER", "mẹ đẻ": "MOTHER",
-    "anh": "BROTHER", "anh trai": "ELDER BROTHER", "em trai": "YOUNGER BROTHER",
-    "chi": "SISTER", "chị": "SISTER", "chi gai": "ELDER SISTER", "chị gái": "ELDER SISTER", "em gai": "YOUNGER SISTER", "em gái": "YOUNGER SISTER",
+    "cha": "FATHER", "bo": "FATHER", "bố": "FATHER", "ba": "FATHER", "bo de": "FATHER", "bố đẻ": "FATHER", "cha đẻ": "FATHER",
+    "me": "MOTHER", "mẹ": "MOTHER", "ma": "MOTHER", "má": "MOTHER", "me de": "MOTHER", "mẹ đẻ": "MOTHER", "má đẻ": "MOTHER",
+    "anh": "BROTHER", "anh trai": "ELDER BROTHER", "anh ruột": "ELDER BROTHER", "em trai": "YOUNGER BROTHER", "em trai ruột": "YOUNGER BROTHER",
+    "chi": "SISTER", "chị": "SISTER", "chi gai": "ELDER SISTER", "chị gái": "ELDER SISTER", "chị ruột": "ELDER SISTER", "em gai": "YOUNGER SISTER", "em gái": "YOUNGER SISTER", "em gái ruột": "YOUNGER SISTER",
     "vo": "WIFE", "vợ": "WIFE", "chong": "HUSBAND", "chồng": "HUSBAND",
     "con": "CHILD", "con trai": "SON", "con gai": "DAUGHTER", "con gái": "DAUGHTER",
-    "ong": "GRANDFATHER", "ông": "GRANDFATHER", "ba noi": "GRANDMOTHER", "bà": "GRANDMOTHER",
-    "chu": "UNCLE", "chú": "UNCLE", "bac": "UNCLE", "bác": "UNCLE", "co": "AUNT", "cô": "AUNT", "di": "AUNT", "dì": "AUNT",
+    "ong": "GRANDFATHER", "ông": "GRANDFATHER", "ong noi": "GRANDFATHER", "ông nội": "GRANDFATHER", "ong ngoai": "GRANDFATHER", "ông ngoại": "GRANDFATHER",
+    "ba noi": "GRANDMOTHER", "bà": "GRANDMOTHER", "ba ngoai": "GRANDMOTHER", "bà nội": "GRANDMOTHER", "bà ngoại": "GRANDMOTHER",
+    "chu": "UNCLE", "chú": "UNCLE", "bac": "UNCLE", "bác": "UNCLE", "cau": "UNCLE", "cậu": "UNCLE",
+    "co": "AUNT", "cô": "AUNT", "di": "AUNT", "dì": "AUNT", "mo": "AUNT", "mợ": "AUNT", "thim": "AUNT", "thím": "AUNT",
+}
+
+OFFLINE_REL_JP = {
+    "cha": "父", "bo": "父", "bố": "父", "ba": "父", "bo de": "父", "bố đẻ": "父", "cha đẻ": "父",
+    "me": "母", "mẹ": "母", "ma": "母", "má": "母", "me de": "母", "mẹ đẻ": "母", "má đẻ": "母",
+    "anh": "兄", "anh trai": "兄", "anh ruột": "兄", "em trai": "弟", "em trai ruột": "弟",
+    "chi": "姉", "chị": "姉", "chi gai": "姉", "chị gái": "姉", "chị ruột": "姉", "em gai": "妹", "em gái": "妹", "em gái ruột": "妹",
+    "vo": "妻", "vợ": "妻", "chong": "夫", "chồng": "夫",
+    "con": "子", "con trai": "長男", "con gái": "長女",
+    "ong": "祖父", "ông": "祖父", "ong noi": "祖父", "ông nội": "祖父", "ong ngoai": "祖父", "ông ngoại": "祖父",
+    "ba noi": "祖母", "bà": "祖母", "ba ngoai": "祖母", "bà nội": "祖母", "bà ngoại": "祖母",
+    "chu": "叔父", "chú": "叔父", "bac": "伯父", "bác": "伯父", "cau": "叔父", "cậu": "叔父",
+    "co": "叔母", "cô": "叔母", "di": "叔母", "dì": "叔母", "mo": "叔母", "mợ": "叔母", "thim": "叔母", "thím": "叔母",
 }
 
 OFFLINE_JOB_EN = {
@@ -60,23 +75,23 @@ OFFLINE_JOB_EN = {
 OFFLINE_JOB_JP = {
     "làm nông": "農業", "nông nghiệp": "農業", "nông dân": "農業", "trồng trọt": "農業", "lam nong": "農業",
     "nội trợ": "主婦", "noi tro": "主婦",
-    "công nhân": "会社員", "cong nhan": "会社員", "lao động tự do": "自由業", "công nhân may": "縫製工",
-    "kinh doanh tự do": "自営業", "buôn bán": "商業", "kinh doanh": "会社員",
-    "thợ may": "縫製工", "may mặc": "縫製業", "tho may": "縫製工",
+    "công nhân": "会社員", "cong nhan": "会社員", "lao động tự do": "自由業", "lao dong tu do": "自由業",
+    "công nhân may": "縫製工", "thợ may": "縫製工", "may mặc": "縫製業", "tho may": "縫製工",
+    "kinh doanh tự do": "自営業", "kinh doanh": "会社員", "buôn bán": "商業", "kinh doanh tu do": "自営業",
     "thợ xây": "建設作業員", "xây dựng": "建設業", "tho xay": "建設作業員",
-    "thợ hàn": "溶接工", "thợ tiện": "旋盤工", "thợ cơ khí": "機械工", "cơ khí": "機械工",
+    "thợ hàn": "溶接工", "tho han": "溶接工", "thợ tiện": "旋盤工", "thợ cơ khí": "機械工", "cơ khí": "機械工",
     "thợ điện": "電気技師", "tho dien": "電気技師",
     "lái xe": "運転手", "tài xế": "運転手", "lai xe": "運転手",
     "học sinh": "学生", "sinh viên": "大学生", "hoc sinh": "学生", "sinh vien": "大学生",
     "nhân viên văn phòng": "会社員", "kế toán": "会計士", "kỹ sư": "エンジニア",
     "giáo viên": "教師", "bác sĩ": "医師", "y tá": "看護師",
     "bán hàng": "販売員", "nhân viên bán hàng": "販売員",
-    "đầu bếp": "調理師", "bảo vệ": "警備員",
+    "đầu bếp": "調理師", "phụ bếp": "調理補助", "bảo vệ": "警備員",
 }
 
 
 def remove_vietnamese_accents(text: str) -> str:
-    """Chuyển chuỗi tiếng Việt có dấu thành không dấu chuẩn."""
+    """Loại bỏ dấu tiếng Việt để tạo tên không dấu chuẩn."""
     if not text:
         return ""
     text = text.replace("Đ", "D").replace("đ", "d")
@@ -84,13 +99,39 @@ def remove_vietnamese_accents(text: str) -> str:
     return "".join([c for c in nfkd if not unicodedata.combining(c)]).strip()
 
 
-def translate_guardian_name_offline(val: str) -> str:
-    """Tự động chuyển tên người giám hộ và quan hệ sang tiếng Anh viết hoa."""
+def translate_guardian_name_jp_offline(val: str) -> str:
+    """Tự động chuyển tên người giám hộ sang tên không dấu (quan hệ tiếng Nhật). Ví dụ: PHAM TRONG HUNG (父)"""
     if not val:
         return ""
     s = val.strip()
-    # Check if there is relationship in parentheses e.g. "Nguyễn Văn B (Bố)" or "Nguyễn Văn B (Cha)"
-    m = re.search(r"^(.*?)\s*[\(\[\{](.+?)[\)\]\}]\s*$", s)
+    # Check if there is relationship in parentheses e.g. "Phạm Trọng Hưng ( Bố)" or "Phạm Trọng Hưng (Bố)" or "Phạm Trọng Hưng （Cha）"
+    m = re.search(r"^(.*?)\s*[\(\[\{（]\s*(.+?)\s*[\)\]\}）]\s*$", s)
+    if m:
+        name_part = m.group(1).strip()
+        rel_part = m.group(2).strip().lower()
+        no_accent_name = remove_vietnamese_accents(name_part).upper()
+        rel_jp = OFFLINE_REL_JP.get(rel_part, remove_vietnamese_accents(rel_part).upper())
+        return f"{no_accent_name} ({rel_jp})"
+    
+    # Check if string ends with relationship separated by hyphen or slash e.g. "Phạm Trọng Hưng - Bố"
+    m2 = re.search(r"^(.*?)\s*[-/]\s*(.+?)$", s)
+    if m2:
+        name_part = m2.group(1).strip()
+        rel_part = m2.group(2).strip().lower()
+        if rel_part in OFFLINE_REL_JP:
+            no_accent_name = remove_vietnamese_accents(name_part).upper()
+            return f"{no_accent_name} ({OFFLINE_REL_JP[rel_part]})"
+
+    return remove_vietnamese_accents(s).upper()
+
+
+def translate_guardian_name_offline(val: str) -> str:
+    """Tự động chuyển tên người giám hộ và quan hệ sang tiếng Anh viết hoa. Ví dụ: PHAM TRONG HUNG (FATHER)"""
+    if not val:
+        return ""
+    s = val.strip()
+    # Check if there is relationship in parentheses e.g. "Phạm Trọng Hưng ( Bố)" or "Nguyễn Văn B (Bố)"
+    m = re.search(r"^(.*?)\s*[\(\[\{（]\s*(.+?)\s*[\)\]\}）]\s*$", s)
     if m:
         name_part = m.group(1).strip()
         rel_part = m.group(2).strip().lower()
@@ -290,7 +331,26 @@ def translate_single(field_name: str, value: str, api_key: str = "") -> Optional
         if jp_date:
             return jp_date
 
-    # Guardian name English translation
+    # Guardian name Japanese translation (Tên không dấu + quan hệ tiếng Nhật)
+    if any(k in fn_lower for k in ("guardian_name_jp", "nguoi_giam_ho_jpn", "nguoi_giam_ho_jp", "giam_ho_jp", "guardian_jp")):
+        if not api_key:
+            return translate_guardian_name_jp_offline(val_strip)
+        try:
+            prompt = f"""Chuyen ten nguoi giam ho sau sang ten khong dau viet hoa kem quan he bang TIENG NHAT trong ngoac (vi du: Bo/Cha -> 父, Me -> 母, Anh -> 兄, Chi -> 姉, Em trai -> 弟, Em gai -> 妹, Chu/Bac -> 叔父/伯父, Co/Di -> 叔母):
+Gia tri: {val_strip}
+Vi du:
+- "Pham Trong Hung (Bo)" -> "PHAM TRONG HUNG (父)"
+- "Pham Trong Hung ( Bố)" -> "PHAM TRONG HUNG (父)"
+- "Nguyen Van A (Cha)" -> "NGUYEN VAN A (父)"
+- "Tran Thi B (Me)" -> "TRAN THI B (母)"
+- "Nguyen Van C (Anh)" -> "NGUYEN VAN C (兄)"
+
+Chi tra ve ten khong dau kem quan he tieng Nhat, khong giai thich."""
+            return _generate(api_key, prompt)
+        except Exception:
+            return translate_guardian_name_jp_offline(val_strip)
+
+    # Guardian name English translation (Tên không dấu + quan hệ tiếng Anh)
     if any(k in fn_lower for k in ("giam_ho_en", "guardian_name_en", "guardian_en", "nguoi_giam_ho_en", "guardian_name")):
         if not api_key:
             return translate_guardian_name_offline(val_strip)
@@ -298,6 +358,7 @@ def translate_single(field_name: str, value: str, api_key: str = "") -> Optional
             prompt = f"""Chuyen ten nguoi giam ho sau sang tieng Anh viet hoa khong dau (neu co quan he nhu Cha, Me thi dich quan he sang tieng Anh nhu FATHER, MOTHER):
 Gia tri: {val_strip}
 Vi du:
+- "Pham Trong Hung (Bo)" -> "PHAM TRONG HUNG (FATHER)"
 - "Nguyen Van A (Cha)" -> "NGUYEN VAN A (FATHER)"
 - "Le Thi B (Me)" -> "LE THI B (MOTHER)"
 - "Tran Van C" -> "TRAN VAN C"

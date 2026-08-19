@@ -9,7 +9,12 @@ from io import BytesIO
 from typing import Optional
 import openpyxl
 
-from core.translator import translate_guardian_name_offline, OFFLINE_JOB_EN, OFFLINE_JOB_JP
+from core.translator import (
+    translate_guardian_name_offline,
+    translate_guardian_name_jp_offline,
+    OFFLINE_JOB_EN,
+    OFFLINE_JOB_JP,
+)
 
 
 def parse_date_str(val) -> Optional[str]:
@@ -322,9 +327,11 @@ def parse_candidate_form_excel(file_bytes_or_path) -> dict:
                 break
 
     guardian_name_en_str = None
+    guardian_name_jp_str = None
     if guardian_name:
         raw_g_str = f"{guardian_name} ({guardian_rel})" if guardian_rel else guardian_name
         guardian_name_en_str = translate_guardian_name_offline(raw_g_str)
+        guardian_name_jp_str = translate_guardian_name_jp_offline(raw_g_str)
 
     candidate_dict = {
         "full_name_vn": full_name_vn,
@@ -343,6 +350,7 @@ def parse_candidate_form_excel(file_bytes_or_path) -> dict:
         "address_vn": address_vn or None,
         "guardian_name_vn": guardian_name or None,
         "guardian_name": guardian_name or None,
+        "guardian_name_jp": guardian_name_jp_str,
         "guardian_name_en": guardian_name_en_str,
         "guardian_relationship": guardian_rel or None,
         "guardian_job_vn": guardian_job_vn,

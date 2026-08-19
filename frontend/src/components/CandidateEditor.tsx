@@ -6,6 +6,7 @@ import {
   formatDateVN,
   removeVietnameseAccents,
   translateGuardianNameOffline,
+  translateGuardianNameJpOffline,
   OFFLINE_JOBS_EN,
   OFFLINE_JOBS_JP,
 } from '../utils/dateFormat';
@@ -385,6 +386,7 @@ export function CandidateEditor({ profile, onSave, onBack, onDelete, onDownloadR
     // 2. Cập nhật dữ liệu vào state với quy tắc dự phòng ngoại tuyến đầy đủ
     const dobJp = cand.date_of_birth ? toJapaneseDate(cand.date_of_birth) : undefined;
     const nameEng = t.full_name_eng || (cand.full_name_vn ? removeVietnameseAccents(cand.full_name_vn).toUpperCase() : cand.full_name_eng);
+    const guardianNameJp = t.guardian_name_jp || (cand.guardian_name_vn ? translateGuardianNameJpOffline(cand.guardian_name_vn) : cand.guardian_name_jp);
     const guardianNameEng = t.guardian_name_en || (cand.guardian_name_vn ? translateGuardianNameOffline(cand.guardian_name_vn) : cand.guardian_name_en);
     const guardianJobEng = t.guardian_job_en || (cand.guardian_job_vn ? OFFLINE_JOBS_EN[cand.guardian_job_vn.toLowerCase()] || cand.guardian_job_vn : cand.guardian_job_en);
     const guardianJobJp = t.guardian_job_jp || (cand.guardian_job_vn ? OFFLINE_JOBS_JP[cand.guardian_job_vn.toLowerCase()] || cand.guardian_job_vn : cand.guardian_job_jp);
@@ -409,7 +411,7 @@ export function CandidateEditor({ profile, onSave, onBack, onDelete, onDownloadR
         address_jp:          t.dia_chi_jpn ?? prev.address_jp,
         birthplace_jp:       t.noi_sinh_jpn ?? prev.birthplace_jp,
         guardian_name_en:    guardianNameEng ?? prev.guardian_name_en,
-        guardian_name_jp:    t.guardian_name_jp ?? prev.guardian_name_jp,
+        guardian_name_jp:    guardianNameJp ?? prev.guardian_name_jp,
         guardian_job_en:     guardianJobEng ?? prev.guardian_job_en,
         guardian_job_jp:     guardianJobJp ?? prev.guardian_job_jp,
         guardian_address_jp: t.dc_nguoi_gh_jpn ?? prev.guardian_address_jp,
@@ -872,12 +874,12 @@ export function CandidateEditor({ profile, onSave, onBack, onDelete, onDownloadR
               <Section title="Người giám hộ / Liên lạc khẩn cấp">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
                   <Field label="Tên người giám hộ (VN)">
-                    <Inp value={cand.guardian_name_vn} onChange={v => setC('guardian_name_vn', v)} placeholder="Nguyễn Văn B (Cha)" />
+                    <Inp value={cand.guardian_name_vn} onChange={v => setC('guardian_name_vn', v)} placeholder="Nguyễn Văn B (Bố)" />
                   </Field>
-                  <Field label="Tên người giám hộ (Tiếng Anh)" en>
+                  <Field label="Tên người giám hộ (Tiếng Nhật)" jp>
                     <div className="flex gap-2 items-end">
-                      <Inp value={cand.guardian_name_en} onChange={v => setC('guardian_name_en', v)} placeholder="NGUYEN VAN B (FATHER)" en />
-                      <TranslateBtn fieldName="guardian_name_en" value={cand.guardian_name_vn ?? ''} onResult={v => setC('guardian_name_en', v)} lang="en" />
+                      <Inp value={cand.guardian_name_jp} onChange={v => setC('guardian_name_jp', v)} placeholder="PHAM TRONG HUNG (父)" jp />
+                      <TranslateBtn fieldName="guardian_name_jp" value={cand.guardian_name_vn ?? ''} onResult={v => setC('guardian_name_jp', v)} lang="ja" />
                     </div>
                   </Field>
                   <Field label="Quan hệ với TTS">
@@ -887,22 +889,16 @@ export function CandidateEditor({ profile, onSave, onBack, onDelete, onDownloadR
                   <Field label="Nghề nghiệp người GH (VN)">
                     <Inp value={cand.guardian_job_vn} onChange={v => setC('guardian_job_vn', v)} placeholder="Làm nông, Nội trợ, Công nhân..." />
                   </Field>
-                  <Field label="Nghề nghiệp người GH (Tiếng Anh)" en>
-                    <div className="flex gap-2 items-end">
-                      <Inp value={cand.guardian_job_en} onChange={v => setC('guardian_job_en', v)} placeholder="Farmer, Housewife..." en />
-                      <TranslateBtn fieldName="guardian_job_en" value={cand.guardian_job_vn ?? ''} onResult={v => setC('guardian_job_en', v)} lang="en" />
-                    </div>
-                  </Field>
                   <Field label="Nghề nghiệp người GH (Tiếng Nhật)" jp>
                     <div className="flex gap-2 items-end">
                       <Inp value={cand.guardian_job_jp} onChange={v => setC('guardian_job_jp', v)} placeholder="農業, 主婦..." jp />
                       <TranslateBtn fieldName="guardian_job_jp" value={cand.guardian_job_vn ?? ''} onResult={v => setC('guardian_job_jp', v)} lang="ja" />
                     </div>
                   </Field>
-
                   <Field label="SĐT người giám hộ">
                     <Inp value={cand.guardian_phone} onChange={v => setC('guardian_phone', v)} placeholder="0912 345 678" />
                   </Field>
+
                   <Field label="Địa chỉ người giám hộ (VN)">
                     <Inp value={cand.guardian_address_vn} onChange={v => setC('guardian_address_vn', v)} />
                   </Field>
@@ -931,21 +927,17 @@ export function CandidateEditor({ profile, onSave, onBack, onDelete, onDownloadR
                       <Field label="Nghề nghiệp (VN)">
                         <Inp value={fm.occupation} onChange={v => setFamily(family.map((f, j) => j === i ? { ...f, occupation: v } : f))} placeholder="Làm nông, Công nhân..." />
                       </Field>
-                      <Field label="Nghề nghiệp (Tiếng Anh)" en>
-                        <div className="flex gap-2 items-end">
-                          <Inp value={fm.occupation_en} onChange={v => setFamily(family.map((f, j) => j === i ? { ...f, occupation_en: v } : f))} placeholder="Farmer, Worker..." en />
-                          <TranslateBtn fieldName="job_en" value={fm.occupation ?? ''} onResult={v => setFamily(family.map((f, j) => j === i ? { ...f, occupation_en: v } : f))} lang="en" />
-                        </div>
-                      </Field>
                       <Field label="Nghề nghiệp (Tiếng Nhật)" jp>
                         <div className="flex gap-2 items-end">
                           <Inp value={fm.occupation_jp} onChange={v => setFamily(family.map((f, j) => j === i ? { ...f, occupation_jp: v } : f))} placeholder="農業, 会社員..." jp />
                           <TranslateBtn fieldName="job_jp" value={fm.occupation ?? ''} onResult={v => setFamily(family.map((f, j) => j === i ? { ...f, occupation_jp: v } : f))} lang="ja" />
                         </div>
                       </Field>
-                      <Field label="Thu nhập hàng tháng">
-                        <Inp value={fm.monthly_income} onChange={v => setFamily(family.map((f, j) => j === i ? { ...f, monthly_income: v } : f))} placeholder="10,000,000 VND" />
-                      </Field>
+                      <div className="col-span-1 md:col-span-2">
+                        <Field label="Thu nhập hàng tháng">
+                          <Inp value={fm.monthly_income} onChange={v => setFamily(family.map((f, j) => j === i ? { ...f, monthly_income: v } : f))} placeholder="10,000,000 VND" />
+                        </Field>
+                      </div>
                     </div>
                   </div>
                 ))}

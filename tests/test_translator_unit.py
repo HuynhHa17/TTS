@@ -81,11 +81,25 @@ class TestTranslateSingleOffline:
         assert translate_single("ngay_cap_cccd", "10/05/2021") == "2021年05月10日"
 
     def test_guardian_name_fallback_offline(self):
+        # English
         res = translate_single("guardian_name_en", "Nguyễn Văn B (Bố)", api_key="")
         assert res == "NGUYEN VAN B (FATHER)"
 
-        res2 = translate_single("guardian_name_en", "Trần Thị C (Mẹ)", api_key="")
-        assert res2 == "TRAN THI C (MOTHER)"
+        res2 = translate_single("guardian_name_en", "Phạm Trọng Hưng ( Bố)", api_key="")
+        assert res2 == "PHAM TRONG HUNG (FATHER)"
+
+        res3 = translate_single("guardian_name_en", "Trần Thị C (Mẹ)", api_key="")
+        assert res3 == "TRAN THI C (MOTHER)"
+
+        # Japanese (Tên không dấu + quan hệ tiếng Nhật)
+        jp1 = translate_single("guardian_name_jp", "Phạm Trọng Hưng ( Bố)", api_key="")
+        assert jp1 == "PHAM TRONG HUNG (父)"
+
+        jp2 = translate_single("guardian_name_jp", "Trần Thị C (Mẹ)", api_key="")
+        assert jp2 == "TRAN THI C (母)"
+
+        jp3 = translate_single("guardian_name_jp", "Nguyễn Văn D (Anh trai)", api_key="")
+        assert jp3 == "NGUYEN VAN D (兄)"
 
     def test_job_en_and_jp_offline_translation(self):
         assert translate_single("job_en", "Làm nông", api_key="") == "Farmer"
