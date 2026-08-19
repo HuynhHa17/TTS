@@ -331,6 +331,10 @@ def translate_single(field_name: str, value: str, api_key: str = "") -> Optional
         if jp_date:
             return jp_date
 
+    # Latin / No accent name conversion (does not require api_key)
+    if "guardian" not in fn_lower and any(k in fn_lower for k in ("full_name_eng", "full_name_en", "latin_name", "latin", "ten_khong_dau", "tv_ten_en", "member_name")):
+        return remove_vietnamese_accents(val_strip).upper()
+
     # Guardian name Japanese translation (Tên không dấu + quan hệ tiếng Nhật)
     if any(k in fn_lower for k in ("guardian_name_jp", "nguoi_giam_ho_jpn", "nguoi_giam_ho_jp", "giam_ho_jp", "guardian_jp")):
         if not api_key:

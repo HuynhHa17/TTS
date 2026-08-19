@@ -919,11 +919,43 @@ export function CandidateEditor({ profile, onSave, onBack, onDelete, onDownloadR
                       {family.length > 1 && <RemBtn onClick={() => setFamily(family.filter((_, j) => j !== i))} />}
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                      <Field label="Quan hệ"><Sel value={fm.relationship} onChange={v => setFamily(family.map((f, j) => j === i ? { ...f, relationship: v } : f))} opts={RELATIONSHIPS} /></Field>
-                      <Field label="Họ tên"><Inp value={fm.full_name} onChange={v => setFamily(family.map((f, j) => j === i ? { ...f, full_name: v } : f))} /></Field>
-                      <Field label="Tuổi"><Inp value={fm.age} onChange={v => setFamily(family.map((f, j) => j === i ? { ...f, age: Number(v) } : f))} type="number" /></Field>
-                      <Field label="Sống chung"><Sel value={fm.living_together} onChange={v => setFamily(family.map((f, j) => j === i ? { ...f, living_together: v } : f))} opts={YN} /></Field>
-                      
+                      <Field label="Quan hệ">
+                        <Sel value={fm.relationship} onChange={v => setFamily(family.map((f, j) => j === i ? { ...f, relationship: v } : f))} opts={RELATIONSHIPS} />
+                      </Field>
+                      <Field label="Họ tên (VN)">
+                        <Inp 
+                          value={fm.full_name} 
+                          onChange={v => {
+                            const latin = removeVietnameseAccents(v).toUpperCase();
+                            setFamily(family.map((f, j) => j === i ? { ...f, full_name: v, full_name_en: f.full_name_en || latin } : f));
+                          }} 
+                          placeholder="Nguyễn Văn A" 
+                        />
+                      </Field>
+                      <Field label="Họ tên (Latin không dấu)" jp>
+                        <div className="flex gap-2 items-end">
+                          <Inp 
+                            value={fm.full_name_en} 
+                            onChange={v => setFamily(family.map((f, j) => j === i ? { ...f, full_name_en: v } : f))} 
+                            placeholder="NGUYEN VAN A" 
+                            jp 
+                          />
+                          <TranslateBtn 
+                            fieldName="latin_name" 
+                            value={fm.full_name ?? ''} 
+                            onResult={v => setFamily(family.map((f, j) => j === i ? { ...f, full_name_en: removeVietnameseAccents(v || fm.full_name).toUpperCase() } : f))} 
+                            lang="ja" 
+                            label="Dịch" 
+                          />
+                        </div>
+                      </Field>
+                      <Field label="Tuổi">
+                        <Inp value={fm.age} onChange={v => setFamily(family.map((f, j) => j === i ? { ...f, age: Number(v) } : f))} type="number" />
+                      </Field>
+
+                      <Field label="Sống chung">
+                        <Sel value={fm.living_together} onChange={v => setFamily(family.map((f, j) => j === i ? { ...f, living_together: v } : f))} opts={YN} />
+                      </Field>
                       <Field label="Nghề nghiệp (VN)">
                         <Inp value={fm.occupation} onChange={v => setFamily(family.map((f, j) => j === i ? { ...f, occupation: v } : f))} placeholder="Làm nông, Công nhân..." />
                       </Field>
@@ -933,11 +965,9 @@ export function CandidateEditor({ profile, onSave, onBack, onDelete, onDownloadR
                           <TranslateBtn fieldName="job_jp" value={fm.occupation ?? ''} onResult={v => setFamily(family.map((f, j) => j === i ? { ...f, occupation_jp: v } : f))} lang="ja" />
                         </div>
                       </Field>
-                      <div className="col-span-1 md:col-span-2">
-                        <Field label="Thu nhập hàng tháng">
-                          <Inp value={fm.monthly_income} onChange={v => setFamily(family.map((f, j) => j === i ? { ...f, monthly_income: v } : f))} placeholder="10,000,000 VND" />
-                        </Field>
-                      </div>
+                      <Field label="Thu nhập hàng tháng">
+                        <Inp value={fm.monthly_income} onChange={v => setFamily(family.map((f, j) => j === i ? { ...f, monthly_income: v } : f))} placeholder="10,000,000 VND" />
+                      </Field>
                     </div>
                   </div>
                 ))}

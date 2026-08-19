@@ -12,6 +12,7 @@ import openpyxl
 from core.translator import (
     translate_guardian_name_offline,
     translate_guardian_name_jp_offline,
+    remove_vietnamese_accents,
     OFFLINE_JOB_EN,
     OFFLINE_JOB_JP,
 )
@@ -275,10 +276,13 @@ def parse_candidate_form_excel(file_bytes_or_path) -> dict:
             job_en = OFFLINE_JOB_EN.get(job.lower(), None) if job else None
             job_jp = OFFLINE_JOB_JP.get(job.lower(), None) if job else None
 
+            name_en = remove_vietnamese_accents(name).upper() if name else None
+
             family_members.append({
                 "relationship": rel or "Người thân",
                 "relationship_vn": rel or "Người thân",
                 "full_name": name or "Thành viên",
+                "full_name_en": name_en,
                 "age": calc_age,
                 "birth_year": byear_num,
                 "living_together": "Có" if is_cohab else "Không",

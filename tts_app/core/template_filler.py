@@ -2,6 +2,8 @@ import os
 import openpyxl
 from datetime import datetime
 
+from core.translator import remove_vietnamese_accents, format_date_to_jp
+
 def _calculate_age(dob_str):
     if not dob_str:
         return ""
@@ -133,11 +135,15 @@ def fill_rirekisho_excel(candidate, template_path, output_path):
         rel = f.relationship or ""
         rel_jp = _rel_to_jp(rel)
         set_val(ws, f'A{row}', rel_jp)
-        set_val(ws, f'C{row}', f.full_name or "")
+        # Ưu tiên họ tên Latin không dấu
+        fam_name = f.full_name_en or (remove_vietnamese_accents(f.full_name).upper() if f.full_name else "")
+        set_val(ws, f'C{row}', fam_name)
         set_val(ws, f'K{row}', str(f.age) if f.age is not None else "")
         is_live = str(f.living_together or "").lower() in ["có", "yes", "true", "1", "o", "⭕"]
         set_val(ws, f'M{row}', "⭕" if is_live else "")
-        set_val(ws, f'O{row}', f.occupation or f.workplace or "")
+        # Ưu tiên nghề nghiệp tiếng Nhật
+        fam_occ = f.occupation_jp or f.occupation or f.workplace or ""
+        set_val(ws, f'O{row}', fam_occ)
         if hasattr(f, 'monthly_income') and f.monthly_income:
             set_val(ws, f'X{row}', str(f.monthly_income))
 

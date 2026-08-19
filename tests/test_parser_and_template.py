@@ -151,11 +151,11 @@ class TestTemplateFillerAndRelMapping:
             assert ws_filled["E5"].value == "DO MINH QUAN"
             # Kiểm tra ngày sinh JP
             assert ws_filled["E7"].value == "2000年08月15日"
-            # Kiểm tra quan hệ gia đình đã được dịch sang chữ Hán
+            # Kiểm tra quan hệ gia đình đã được dịch sang chữ Hán và tên Latin không dấu
             assert ws_filled["A26"].value == "父"
-            assert ws_filled["C26"].value == "Đỗ Văn Bố"
+            assert ws_filled["C26"].value == "DO VAN BO"
             assert ws_filled["A27"].value == "母"
-            assert ws_filled["C27"].value == "Nguyễn Thị Mẹ"
+            assert ws_filled["C27"].value == "NGUYEN THI ME"
         finally:
             if os.path.exists(out_path):
                 os.remove(out_path)

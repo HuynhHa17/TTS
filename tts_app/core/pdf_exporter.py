@@ -27,6 +27,31 @@ MARGIN = 8
 CONTENT_W = PAGE_W - 2 * MARGIN
 
 
+from core.translator import remove_vietnamese_accents
+
+_REL_MAP_VN_TO_JP = {
+    "cha": "父", "bố": "父", "ba": "父", "bố/mẹ": "父", "father": "父",
+    "mẹ": "母", "má": "母", "mother": "母",
+    "anh": "兄", "anh trai": "兄", "brother": "兄",
+    "chị": "姉", "chị gái": "姉", "sister": "姉",
+    "em": "弟", "em trai": "弟",
+    "em gái": "妹",
+    "vợ": "妻", "wife": "妻",
+    "chồng": "夫", "husband": "夫",
+    "con": "子", "con trai": "子", "con gái": "子",
+    "ông": "祖父", "ông nội": "祖父", "ông ngoại": "祖父",
+    "bà": "祖母", "bà nội": "祖母", "bà ngoại": "祖母",
+    "chú": "叔父", "bác": "伯父", "cậu": "叔父",
+    "cô": "叔母", "dì": "叔母", "mợ": "叔母", "thím": "叔母",
+}
+
+def _rel_to_jp(rel_str: str) -> str:
+    if not rel_str:
+        return ""
+    s = str(rel_str).strip()
+    return _REL_MAP_VN_TO_JP.get(s.lower(), s)
+
+
 def _fmt_date_jp(val: str) -> str:
     """Chuyển chuỗi ngày → dạng YYYY年MM月DD日."""
     if not val:
@@ -185,7 +210,7 @@ def build_rirekisho_pdf(profile: dict) -> bytes:
 
     # ── 2. TÊN + NGÀY SINH ─────────────────────────────────────────────────────
     name_jp   = _v(c.get("full_name_katakana"), "—")
-    name_eng  = _v(c.get("full_name_eng"), "—")
+    name_eng  = _v(c.get("full_name_eng") or (remove_vietnamese_accents(c.get("full_name_vn", "")).upper() if c.get("full_name_vn") else ""), "—")
     dob_str   = _fmt_date_jp(_v(c.get("date_of_birth_jp") or c.get("date_of_birth")))
     age_str   = _age(_v(c.get("date_of_birth_jp") or c.get("date_of_birth")))
     gender    = _v(c.get("gender"), "")
@@ -338,11 +363,12 @@ def build_rirekisho_pdf(profile: dict) -> bytes:
 
     fam_rows = fam[:6]
     for fm in fam_rows:
-        rel   = _v(fm.get("relationship"))
-        name  = _v(fm.get("full_name"))
+        rel   = _rel_to_jp(_v(fm.get("relationship")))
+        name  = _v(fm.get("full_name_en") or (remove_vietnamese_accents(fm.get("full_name", "")).upper() if fm.get("full_name") else ""))
         age   = _v(fm.get("age"))
-        live  = _v(fm.get("living_together"))
-        occ   = _v(fm.get("occupation"))
+        live_raw = _v(fm.get("living_together"))
+        live  = "⭕" if str(live_raw).lower() in ["có", "yes", "true", "1", "o", "⭕"] else ""
+        occ   = _v(fm.get("occupation_jp") or fm.get("occupation"))
         wp    = _v(fm.get("workplace"))
         occ_full = f"{occ}・{wp}" if occ and wp else occ or wp
         inc   = _v(fm.get("monthly_income"))
