@@ -317,8 +317,10 @@ export function CandidateEditor({ profile, onSave, onBack, onDelete, onDownloadR
       if (!res.ok) { showToast(`❌ ${data.error}`, 'error'); return; }
       const t = data.translations as Record<string, string>;
       // Áp kết quả vào state
+      const dobJp = cand.date_of_birth ? toJapaneseDate(cand.date_of_birth) : undefined;
       setCand(prev => ({
         ...prev,
+        date_of_birth_jp:   dobJp ?? prev.date_of_birth_jp,
         full_name_katakana: t.ten_phien_am ?? prev.full_name_katakana,
         address_jp:         t.dia_chi_jpn ?? prev.address_jp,
         birthplace_jp:      t.noi_sinh_jpn ?? prev.birthplace_jp,
@@ -332,9 +334,15 @@ export function CandidateEditor({ profile, onSave, onBack, onDelete, onDownloadR
       setWorks(prev => prev.map((w, i) => t[`ten_dn_${i + 1}`] ? { ...w, company_name_jp: t[`ten_dn_${i + 1}`] } : w));
       // Giấy tờ
       setDocs(prev => prev.map(d => {
-        if (d.document_type === 'CCCD' && t.noi_cap_cccd_jpn) return { ...d, issue_place_jp: t.noi_cap_cccd_jpn };
-        if (d.document_type === 'Passport' && t.noi_cap_hc_jpn) return { ...d, issue_place_jp: t.noi_cap_hc_jpn };
-        return d;
+        const docJpDate = d.issue_date ? toJapaneseDate(d.issue_date) : undefined;
+        let placeJp = d.issue_place_jp;
+        if (d.document_type === 'CCCD' && t.noi_cap_cccd_jpn) placeJp = t.noi_cap_cccd_jpn;
+        if (d.document_type === 'Passport' && t.noi_cap_hc_jpn) placeJp = t.noi_cap_hc_jpn;
+        return {
+          ...d,
+          issue_date_jp: docJpDate ?? d.issue_date_jp,
+          issue_place_jp: placeJp,
+        };
       }));
       showToast(`✅ Dịch xong ${Object.keys(t).length} trường!`);
     } catch { showToast('❌ Lỗi kết nối', 'error'); }

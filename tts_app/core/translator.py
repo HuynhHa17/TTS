@@ -138,21 +138,68 @@ def translate_fields(fields: dict, api_key: str) -> dict:
     return result
 
 
-def translate_single(field_name: str, value: str, api_key: str) -> Optional[str]:
-    # Direct date conversion if it's a date field or date string
-    if "date" in field_name.lower() or "ngay" in field_name.lower():
-        from datetime import datetime
-        s = value.strip()
-        for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%Y/%m/%d", "%d-%m-%Y", "%d.%m.%Y"):
-            try:
-                d = datetime.strptime(s, fmt)
-                return f"{d.year}年{d.month:02d}月{d.day:02d}日"
-            except ValueError:
-                pass
+def format_date_to_jp(value: str) -> Optional[str]:
+    """Chuyển đổi các định dạng ngày tháng sang tiếng Nhật: YYYY年MM月DD日 hoặc YYYY年MM月."""
+    if not value:
+        return None
+    s = str(value).strip()
+    if not s:
+        return None
+    if "年" in s:
+        return s
 
-    if "giam_ho" in field_name.lower() or "guardian" in field_name.lower():
+    from datetime import datetime
+    # Full date formats
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%Y/%m/%d", "%d-%m-%Y", "%d.%m.%Y", "%Y.%m.%d"):
+        try:
+            d = datetime.strptime(s, fmt)
+            return f"{d.year}年{d.month:02d}月{d.day:02d}日"
+        except ValueError:
+            pass
+
+    # Month/Year formats
+    for fmt in ("%m/%Y", "%m-%Y", "%m.%Y", "%Y/%m", "%Y-%m", "%Y.%m"):
+        try:
+            d = datetime.strptime(s, fmt)
+            return f"{d.year}年{d.month:02d}月"
+        except ValueError:
+            pass
+
+    # Year only
+    if re.match(r"^\d{4}$", s):
+        return f"{s}年"
+
+    # Regex search for date inside string (e.g. ISO timestamp 2000-10-28T00:00:00)
+    m = re.search(r"(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})", s)
+    if m:
+        y, mth, d = m.groups()
+        return f"{int(y)}年{int(mth):02d}月{int(d):02d}日"
+
+    m_ym = re.search(r"(\d{1,2})[-/.](\d{4})", s)
+    if m_ym:
+        mth, y = m_ym.groups()
+        return f"{int(y)}年{int(mth):02d}月"
+
+    return s
+
+
+def translate_single(field_name: str, value: str, api_key: str = "") -> Optional[str]:
+    fn_lower = field_name.lower()
+    val_strip = value.strip() if value else ""
+
+    # Direct date conversion if it's a date field or date string (does not require api_key)
+    if any(k in fn_lower for k in ("date", "ngay", "sinh", "dob", "birth", "nam_sinh", "issue_date")):
+        jp_date = format_date_to_jp(val_strip)
+        if jp_date:
+            return jp_date
+
+    # Guardian name English translation
+    if "giam_ho" in fn_lower or "guardian" in fn_lower:
+        if not api_key:
+            # Fallback simple uppercase without accents if no API key
+            return val_strip.upper()
         prompt = f"""Chuyen ten nguoi giam ho sau sang tieng Anh viet hoa khong dau (neu co quan he nhu Cha, Me thi dich quan he sang tieng Anh nhu FATHER, MOTHER):
-Gia tri: {value}
+Gia tri: {val_strip}
 Vi du:
 - "Nguyen Van A (Cha)" -> "NGUYEN VAN A (FATHER)"
 - "Le Thi B (Me)" -> "LE THI B (MOTHER)"
@@ -161,9 +208,12 @@ Vi du:
 Chi tra ve ten tieng Anh viet hoa, khong giai thich."""
         return _generate(api_key, prompt)
 
+    if not api_key:
+        raise ValueError("Chưa cấu hình Gemini API Key. Vào tab Cài Đặt để nhập.")
+
     prompt = f"""Dich gia tri sau sang tieng Nhat cho ho so TTS:
 Truong: {field_name}
-Gia tri: {value}
+Gia tri: {val_strip}
 
 Quy tac:
 - Ten nguoi -> Katakana

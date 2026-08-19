@@ -9,7 +9,7 @@ from flask import Blueprint, jsonify, send_file, request
 from core.database import get_session
 from core.models import (
     Candidate, IdentityDocument, Education, WorkExperience,
-    SkillExperience, JapanExperience, FamilyMember, CandidateAssignment, to_dict
+    SkillExperience, JapanExperience, FamilyMember, CandidateAssignment, AppSettings, to_dict
 )
 from core.template_filler import fill_rirekisho_excel
 from core.pdf_exporter import build_rirekisho_pdf
@@ -21,9 +21,34 @@ import config
 documents_bp = Blueprint("documents", __name__)
 
 
-def _get_template_path():
-    template_path = os.path.join(config.BASE_DIR, "..", "CVpv.xlsx")
-    return os.path.normpath(template_path)
+def _get_master_path(db=None):
+    if db:
+        row = db.query(AppSettings).filter(AppSettings.key == "excel_output_path").first()
+        if row and row.value:
+            return os.path.abspath(os.path.normpath(row.value))
+    return os.path.abspath(os.path.normpath(config.OUTPUT_FILE))
+
+
+def _get_template_path(db=None):
+    candidates_paths = []
+    if db:
+        row = db.query(AppSettings).filter(AppSettings.key == "template_cv_path").first()
+        if row and row.value:
+            candidates_paths.append(row.value)
+
+    candidates_paths.extend([
+        config.CV_FILE,
+        os.path.join(config.ROOT_DIR, "CVpv.xlsx"),
+        os.path.join(config.BASE_DIR, "..", "CVpv.xlsx"),
+        os.path.join(config.BASE_DIR, "CVpv.xlsx"),
+        os.path.join(config.DATA_DIR, "CVpv.xlsx"),
+    ])
+
+    for p in candidates_paths:
+        if p and os.path.isfile(p):
+            return os.path.abspath(os.path.normpath(p))
+
+    return os.path.abspath(os.path.normpath(config.CV_FILE))
 
 
 @documents_bp.route("/documents/form-template", methods=["GET"])
@@ -93,29 +118,58 @@ def import_form():
 
         for doc in profile_data.get("identityDocuments", []):
             if doc.get("document_number"):
-                cols = {k: v for k, v in doc.items() if k in IdentityDocument.__table__.columns.keys() and k not in ('id', 'candidate_id')}
-                db.add(IdentityDocument(**cols, candidate_id=c.id))
+                db.add(IdentityDocument(
+                    candidate_id=c.id,
+                    document_type=doc.get("doc_type") or doc.get("document_type", "CCCD"),
+                    document_number=doc.get("document_number"),
+                    issue_date=doc.get("issue_date"),
+                    issue_place_vn=doc.get("issue_place") or doc.get("issue_place_vn"),
+                    issue_place_jp=doc.get("issue_place_jp"),
+                ))
 
         for edu in profile_data.get("educations", []):
-            if edu.get("school_name_vn"):
-                cols = {k: v for k, v in edu.items() if k in Education.__table__.columns.keys() and k not in ('id', 'candidate_id')}
-                db.add(Education(**cols, candidate_id=c.id))
+            if edu.get("school_name_vn") or edu.get("start_date"):
+                db.add(Education(
+                    candidate_id=c.id,
+                    school_name_vn=edu.get("school_name_vn"),
+                    school_name_jp=edu.get("school_name_jp"),
+                    start_date=edu.get("start_date"),
+                    end_date=edu.get("end_date"),
+                    education_level=edu.get("education_level") or edu.get("degree_level_vn", "THPT"),
+                ))
 
         for work in profile_data.get("workExperiences", []):
-            if work.get("company_name_vn"):
-                cols = {k: v for k, v in work.items() if k in WorkExperience.__table__.columns.keys() and k not in ('id', 'candidate_id')}
-                db.add(WorkExperience(**cols, candidate_id=c.id))
+            if work.get("company_name_vn") or work.get("start_date"):
+                db.add(WorkExperience(
+                    candidate_id=c.id,
+                    company_name_vn=work.get("company_name_vn"),
+                    company_name_jp=work.get("company_name_jp"),
+                    start_date=work.get("start_date"),
+                    end_date=work.get("end_date"),
+                    job_title_vn=work.get("job_title_vn") or work.get("job_description_vn"),
+                    job_title_jp=work.get("job_title_jp"),
+                    description=work.get("description") or work.get("job_description_vn"),
+                ))
 
         for fam in profile_data.get("familyMembers", []):
-            if fam.get("full_name"):
-                cols = {k: v for k, v in fam.items() if k in FamilyMember.__table__.columns.keys() and k not in ('id', 'candidate_id')}
-                db.add(FamilyMember(**cols, candidate_id=c.id))
+            if fam.get("full_name") or fam.get("name"):
+                db.add(FamilyMember(
+                    candidate_id=c.id,
+                    relationship=fam.get("relationship") or fam.get("relationship_vn") or "Người thân",
+                    full_name=fam.get("full_name") or fam.get("name"),
+                    age=fam.get("age"),
+                    living_together=fam.get("living_together") or ("Có" if fam.get("is_living_together") else "Không"),
+                    occupation=fam.get("occupation") or fam.get("occupation_vn"),
+                    workplace=fam.get("workplace"),
+                    monthly_income=fam.get("monthly_income"),
+                ))
 
         asgn = profile_data.get("assignment", {})
         if asgn.get("internship_field_vn"):
             db.add(CandidateAssignment(
                 candidate_id=c.id,
-                internship_field_vn=asgn.get("internship_field_vn")
+                internship_field_vn=asgn.get("internship_field_vn"),
+                internship_field_jp=asgn.get("internship_field_jp"),
             ))
 
         db.commit()
@@ -171,29 +225,58 @@ def import_forms_batch():
 
                 for doc in profile_data.get("identityDocuments", []):
                     if doc.get("document_number"):
-                        cols = {k: v for k, v in doc.items() if k in IdentityDocument.__table__.columns.keys() and k not in ('id', 'candidate_id')}
-                        db.add(IdentityDocument(**cols, candidate_id=c.id))
+                        db.add(IdentityDocument(
+                            candidate_id=c.id,
+                            document_type=doc.get("doc_type") or doc.get("document_type", "CCCD"),
+                            document_number=doc.get("document_number"),
+                            issue_date=doc.get("issue_date"),
+                            issue_place_vn=doc.get("issue_place") or doc.get("issue_place_vn"),
+                            issue_place_jp=doc.get("issue_place_jp"),
+                        ))
 
                 for edu in profile_data.get("educations", []):
-                    if edu.get("school_name_vn"):
-                        cols = {k: v for k, v in edu.items() if k in Education.__table__.columns.keys() and k not in ('id', 'candidate_id')}
-                        db.add(Education(**cols, candidate_id=c.id))
+                    if edu.get("school_name_vn") or edu.get("start_date"):
+                        db.add(Education(
+                            candidate_id=c.id,
+                            school_name_vn=edu.get("school_name_vn"),
+                            school_name_jp=edu.get("school_name_jp"),
+                            start_date=edu.get("start_date"),
+                            end_date=edu.get("end_date"),
+                            education_level=edu.get("education_level") or edu.get("degree_level_vn", "THPT"),
+                        ))
 
                 for work in profile_data.get("workExperiences", []):
-                    if work.get("company_name_vn"):
-                        cols = {k: v for k, v in work.items() if k in WorkExperience.__table__.columns.keys() and k not in ('id', 'candidate_id')}
-                        db.add(WorkExperience(**cols, candidate_id=c.id))
+                    if work.get("company_name_vn") or work.get("start_date"):
+                        db.add(WorkExperience(
+                            candidate_id=c.id,
+                            company_name_vn=work.get("company_name_vn"),
+                            company_name_jp=work.get("company_name_jp"),
+                            start_date=work.get("start_date"),
+                            end_date=work.get("end_date"),
+                            job_title_vn=work.get("job_title_vn") or work.get("job_description_vn"),
+                            job_title_jp=work.get("job_title_jp"),
+                            description=work.get("description") or work.get("job_description_vn"),
+                        ))
 
                 for fam in profile_data.get("familyMembers", []):
-                    if fam.get("full_name"):
-                        cols = {k: v for k, v in fam.items() if k in FamilyMember.__table__.columns.keys() and k not in ('id', 'candidate_id')}
-                        db.add(FamilyMember(**cols, candidate_id=c.id))
+                    if fam.get("full_name") or fam.get("name"):
+                        db.add(FamilyMember(
+                            candidate_id=c.id,
+                            relationship=fam.get("relationship") or fam.get("relationship_vn") or "Người thân",
+                            full_name=fam.get("full_name") or fam.get("name"),
+                            age=fam.get("age"),
+                            living_together=fam.get("living_together") or ("Có" if fam.get("is_living_together") else "Không"),
+                            occupation=fam.get("occupation") or fam.get("occupation_vn"),
+                            workplace=fam.get("workplace"),
+                            monthly_income=fam.get("monthly_income"),
+                        ))
 
                 asgn = profile_data.get("assignment", {})
                 if asgn.get("internship_field_vn"):
                     db.add(CandidateAssignment(
                         candidate_id=c.id,
-                        internship_field_vn=asgn.get("internship_field_vn")
+                        internship_field_vn=asgn.get("internship_field_vn"),
+                        internship_field_jp=asgn.get("internship_field_jp"),
                     ))
 
                 db.flush()
@@ -232,7 +315,7 @@ def export_rirekisho(candidate_id):
         if not candidate:
             return jsonify({"error": "Candidate not found"}), 404
 
-        template_path = _get_template_path()
+        template_path = _get_template_path(db)
         if not os.path.isfile(template_path):
             return jsonify({"error": f"Template not found at {template_path}"}), 500
 
@@ -292,15 +375,21 @@ def export_tcmmxd(candidate_id):
 
 @documents_bp.route("/documents/khai-tt", methods=["GET"])
 def export_khai_tt():
-    out_path = config.OUTPUT_FILE
-    if os.path.exists(out_path):
-        return send_file(
-            out_path,
-            as_attachment=True,
-            download_name="File_lưu.xlsx",
-            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-    return jsonify({"error": "Chưa có file Master Excel."}), 404
+    db = get_session()
+    try:
+        out_path = _get_master_path(db)
+        if not os.path.exists(out_path):
+            _sync_excel()
+        if os.path.exists(out_path):
+            return send_file(
+                out_path,
+                as_attachment=True,
+                download_name=os.path.basename(out_path) or "File_lưu.xlsx",
+                mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+        return jsonify({"error": "Chưa thể tạo file Master Excel."}), 500
+    finally:
+        db.close()
 
 
 @documents_bp.route("/documents/batch-export", methods=["POST"])
@@ -309,12 +398,11 @@ def batch_export_zip():
     candidate_ids = data.get("candidate_ids", [])
     templates = data.get("templates", ["rirekisho"])
 
-    template_path = _get_template_path()
-    if not os.path.isfile(template_path):
-        return jsonify({"error": "Template CVpv.xlsx not found"}), 500
-
     db = get_session()
     try:
+        template_path = _get_template_path(db)
+        master_path = _get_master_path(db)
+
         if candidate_ids:
             candidates = db.query(Candidate).filter(Candidate.id.in_(candidate_ids)).all()
         else:
@@ -333,7 +421,7 @@ def batch_export_zip():
                 prefix = cand.profile_code or f"TTS_{cand.id}"
 
                 # 1. Export Rirekisho Excel if requested
-                if "rirekisho" in templates or "all" in templates:
+                if ("rirekisho" in templates or "all" in templates) and os.path.isfile(template_path):
                     temp_file = os.path.join(temp_dir, f"{uuid.uuid4()}_rirekisho.xlsx")
                     try:
                         fill_rirekisho_excel(cand, template_path, temp_file)
@@ -356,8 +444,10 @@ def batch_export_zip():
 
             # 3. Export Master Excel if requested
             if "khai_form" in templates or "khai_tt" in templates or "master_excel" in templates or "all" in templates:
-                if os.path.exists(config.OUTPUT_FILE):
-                    zip_file.write(config.OUTPUT_FILE, arcname="File_luu_Master.xlsx")
+                if not os.path.exists(master_path):
+                    _sync_excel()
+                if os.path.exists(master_path):
+                    zip_file.write(master_path, arcname="File_luu_Master.xlsx")
 
             # 4. Export Candidate Blank Form if requested
             if "form_template" in templates or "candidate_form" in templates:

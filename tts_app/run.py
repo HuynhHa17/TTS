@@ -11,11 +11,10 @@ from flask_cors import CORS
 import config
 from core.database import init_db
 from api.candidates   import candidates_bp
-# from api.import_cv    import import_cv_bp
-# from api.import_gsheet import import_gsheet_bp
+from api.import_cv    import import_cv_bp
 from api.export       import export_bp
 from api.translate    import translate_bp
-# from api.lookup       import lookup_bp
+from api.lookup       import lookup_bp
 from api.settings     import settings_bp
 from api.excel_io     import excel_io_bp
 from api.documents    import documents_bp
@@ -26,11 +25,10 @@ CORS(app)
 
 # Register blueprints
 app.register_blueprint(candidates_bp,    url_prefix="/api")
-# app.register_blueprint(import_cv_bp,     url_prefix="/api")
-# app.register_blueprint(import_gsheet_bp, url_prefix="/api")
+app.register_blueprint(import_cv_bp,     url_prefix="/api")
 app.register_blueprint(export_bp,        url_prefix="/api")
 app.register_blueprint(translate_bp,     url_prefix="/api")
-# app.register_blueprint(lookup_bp,        url_prefix="/api")
+app.register_blueprint(lookup_bp,        url_prefix="/api")
 app.register_blueprint(settings_bp,      url_prefix="/api")
 app.register_blueprint(excel_io_bp,      url_prefix="/api")
 app.register_blueprint(documents_bp,     url_prefix="/api")

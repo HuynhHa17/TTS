@@ -53,22 +53,28 @@ def _clean(s) -> Optional[str]:
 
 
 def _extract_age(text: str) -> Optional[str]:
-    """Extract age from '年齢 (26)歳' → '26歳'"""
+    """Extract age from '年齢 (26)歳' or '年齢（26）歳' → '26歳'"""
     if not text:
         return None
-    m = re.search(r'\((\d+)\)', text)
+    m = re.search(r'[\(（](\d+)[\)）]', text)
     if m:
         return f"{m.group(1)}歳"
+    m_num = re.search(r'^\d+$', str(text).strip())
+    if m_num:
+        return f"{m_num.group()}歳"
     return None
 
 
 def _extract_age_vnm(text: str) -> Optional[str]:
-    """Extract age from '年齢 (26)歳' → '26 tuổi'"""
+    """Extract age from '年齢 (26)歳' or '年齢（26）歳' → '26 tuổi'"""
     if not text:
         return None
-    m = re.search(r'\((\d+)\)', text)
+    m = re.search(r'[\(（](\d+)[\)）]', text)
     if m:
         return f"{m.group(1)} tuổi"
+    m_num = re.search(r'^\d+$', str(text).strip())
+    if m_num:
+        return f"{m_num.group()} tuổi"
     return None
 
 
@@ -90,31 +96,48 @@ def _parse_dob_vnm(dob_jpn: str) -> Optional[str]:
     return dob_jpn
 
 
+def _split_period(period_str: str):
+    """Tách '2015年09月   ～ 2018年06月' thành (start_date, end_date)."""
+    if not period_str:
+        return None, None
+    parts = re.split(r'\s*[～~]\s*|\s+-\s+', period_str)
+    s_date = parts[0].strip() if len(parts) > 0 else ""
+    e_date = parts[1].strip() if len(parts) > 1 else ""
+    return s_date or None, e_date or None
+
+
 def _scan_education(rows: list) -> list:
     """
     Scan rows 12-15 (idx 11-14) for education entries.
-    Returns list of (period, school_name) tuples.
+    Returns list of dicts.
     """
     entries = []
     for idx in range(11, 16):
         period = _clean(_cell(rows, idx, 4))
         school = _clean(_cell(rows, idx, 10))
-        if period and ('年' in period or '～' in period):
-            entries.append((period, school or ""))
+        if period and ('年' in period or '～' in period or '~' in period):
+            s_d, e_d = _split_period(period)
+            entries.append({
+                "period":         period,
+                "school_name_jp": school or "",
+                "school_name_vn": school or "",
+                "start_date":     s_d,
+                "end_date":       e_d,
+            })
     return entries
 
 
 def _scan_work(rows: list) -> list:
     """
     Scan rows 16-20 (idx 15-20) for work history.
-    Returns list of (period, company_job) tuples.
+    Returns list of dicts.
     """
     entries = []
     for idx in range(15, 21):
         period  = _clean(_cell(rows, idx, 4))
         company = _clean(_cell(rows, idx, 10))
         job     = _clean(_cell(rows, idx, 20))
-        if period and ('年' in period or '～' in period or '現在' in period):
+        if period and ('年' in period or '～' in period or '~' in period or '現在' in period):
             if company and job:
                 label = f"{company}（{job}）"
             elif company:
@@ -123,7 +146,17 @@ def _scan_work(rows: list) -> list:
                 label = job
             else:
                 label = ""
-            entries.append((period, label))
+            s_d, e_d = _split_period(period)
+            entries.append({
+                "period":          period,
+                "label":           label,
+                "company_name_jp": company or "",
+                "company_name_vn": company or "",
+                "job_title_jp":    job or "",
+                "job_title_vn":    job or "",
+                "start_date":      s_d,
+                "end_date":        e_d,
+            })
     return entries
 
 
@@ -137,14 +170,33 @@ def _scan_family(rows: list) -> list:
     for idx in range(24, 31):
         rel  = _clean(_cell(rows, idx, 0))
         name = _clean(_cell(rows, idx, 2))
-        age  = _clean(_cell(rows, idx, 10))
+        age_str = _clean(_cell(rows, idx, 10))
+        cohab = _clean(_cell(rows, idx, 12))
         job  = _clean(_cell(rows, idx, 14))
-        if rel and name and (rel in relations_jp or len(rel) <= 3):
+        income = _clean(_cell(rows, idx, 23))
+
+        if rel and name and (rel in relations_jp or len(rel) <= 4):
+            age_int = None
+            if age_str:
+                m = re.search(r'\d+', age_str)
+                if m:
+                    age_int = int(m.group())
+
+            is_live = cohab in ("O", "o", "有", "⭕", "Có", "1") if cohab else True
+            rel_vn = _REL_MAP.get(rel, rel)
+
             family.append({
-                "rel_jp":  rel,
-                "name":    name,
-                "age":     age,
-                "job":     job,
+                "rel_jp":          rel,
+                "relationship":    rel_vn,
+                "relationship_vn": rel_vn,
+                "name":            name,
+                "full_name":       name,
+                "age":             age_int,
+                "living_together": "Có" if is_live else "Không",
+                "is_living_together": is_live,
+                "job":             job,
+                "occupation":      job,
+                "monthly_income":  income,
             })
     return family
 
@@ -152,10 +204,10 @@ def _scan_family(rows: list) -> list:
 def _detect_guardian(family: list) -> dict:
     """Choose guardian from family (prefer 父, then 母)."""
     for member in family:
-        if member["rel_jp"] == "父":
+        if member.get("rel_jp") == "父":
             return member
     for member in family:
-        if member["rel_jp"] == "母":
+        if member.get("rel_jp") == "母":
             return member
     if family:
         return family[0]
@@ -256,7 +308,37 @@ def parse_cv_sheet(ws) -> dict:
     ma_ho_so = f"TTS-{candidate_num:03d}"
 
     return {
-        # Identity
+        # Candidate normalized model keys
+        "full_name_vn":       ten_eng,
+        "full_name_eng":      ten_eng,
+        "full_name_katakana": ten_phien_am,
+        "profile_code":       ma_ho_so,
+        "date_of_birth":      dob_vnm,
+        "date_of_birth_jp":   dob_jpn,
+        "gender":             "Nam" if (gender_cell and "男" in gender_cell) else ("Nữ" if (gender_cell and "女" in gender_cell) else "Nam"),
+        "marital_status":     "Đã kết hôn" if (hon_nhan and "既婚" in hon_nhan) else "Độc thân",
+        "has_children":       "Có" if (hon_nhan and "有" in hon_nhan) else "Không",
+        "birthplace_jp":      noi_sinh_jpn,
+        "address_jp":         dia_chi_jpn,
+        "guardian_name_vn":   guardian_name_vnm,
+        "guardian_name_jp":   guardian_name_jpn,
+        "foreign_languages":  tieng_nhat_cell,
+        "purpose_to_japan_jp":muc_dich,
+        "plan_after_return_jp":sau_tap,
+        "strengths_jp":       uu_diem,
+        "weaknesses_jp":      nhuoc_diem,
+        "hobbies_jp":         so_thich,
+        "height_cm":          float(chieu_cao) if chieu_cao and chieu_cao.replace('.', '', 1).isdigit() else None,
+        "weight_kg":          float(can_nang) if can_nang and can_nang.replace('.', '', 1).isdigit() else None,
+        "blood_type":         nhom_mau,
+        "preferred_hand":     tay_thuan,
+
+        # Structured child lists
+        "educations":         edu,
+        "work_experiences":    work,
+        "family_members":     family,
+
+        # Flat 60-col keys for legacy / direct mapping
         "ma_ho_so":      ma_ho_so,
         "ten_vnm":       ten_eng,        # VNM name = same as Latin initially; user adds diacritics
         "ten_eng":       ten_eng,

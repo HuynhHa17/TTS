@@ -1,7 +1,7 @@
 import json
 import os
 from flask import Blueprint, request, jsonify, current_app
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 from core.database import get_session
 from core.models import (
     Candidate, IdentityDocument, Education, WorkExperience,
@@ -352,6 +352,11 @@ def create_candidate():
             if not _is_empty(fam):
                 db.add(FamilyMember(**{k: v for k, v in fam.items() if k in FamilyMember.__table__.columns.keys() and k not in ('id', 'candidate_id')}, candidate_id=c.id))
 
+        ass_data = _sanitize(data.get("assignment"))
+        if ass_data and not _is_empty(ass_data):
+            valid_ass = set(CandidateAssignment.__table__.columns.keys()) - {'id', 'candidate_id'}
+            db.add(CandidateAssignment(**{k: v for k, v in ass_data.items() if k in valid_ass}, candidate_id=c.id))
+
         db.commit()
         db.refresh(c)
         result = _build_full_profile(c)
@@ -427,6 +432,14 @@ def update_candidate(cid):
             if not _is_empty(fam):
                 db.add(FamilyMember(**{k: v for k, v in fam.items() if k in FamilyMember.__table__.columns.keys() and k not in ('id', 'candidate_id')}, candidate_id=c.id))
 
+        if c.assignment:
+            db.delete(c.assignment)
+        db.flush()
+        ass_data = _sanitize(data.get("assignment"))
+        if ass_data and not _is_empty(ass_data):
+            valid_ass = set(CandidateAssignment.__table__.columns.keys()) - {'id', 'candidate_id'}
+            db.add(CandidateAssignment(**{k: v for k, v in ass_data.items() if k in valid_ass}, candidate_id=c.id))
+
         db.commit()
         db.refresh(c)
         result = _build_full_profile(c)
@@ -472,5 +485,29 @@ def batch_delete_candidates():
     except Exception as e:
         db.rollback()
         return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()
+
+
+@candidates_bp.route("/candidates/stats", methods=["GET"])
+def candidate_stats():
+    db = get_session()
+    try:
+        total = db.query(Candidate).count()
+        by_status = {}
+        for row in db.query(Candidate.status, func.count(Candidate.id)).group_by(Candidate.status).all():
+            if row[0]:
+                by_status[row[0]] = row[1]
+
+        by_gender = {}
+        for row in db.query(Candidate.gender, func.count(Candidate.id)).group_by(Candidate.gender).all():
+            if row[0]:
+                by_gender[row[0]] = row[1]
+
+        return jsonify({
+            "total": total,
+            "by_status": by_status,
+            "by_gender": by_gender
+        })
     finally:
         db.close()

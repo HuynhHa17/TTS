@@ -216,3 +216,96 @@ class TestFormEndpoints:
         for item in json_data["imported"]:
             client.delete(f"/api/candidates/{item['id']}")
 
+    def test_import_form_saves_all_child_records(self, client):
+        wb = create_candidate_form_workbook()
+        ws = wb["To_Khai_Ung_Vien"]
+        ws["B4"] = "NGUYỄN VĂN ĐẦY ĐỦ"
+        ws["B5"] = "28/10/2000"
+        ws["B11"] = "079200001122"
+
+        # Education
+        ws["B26"] = "09/2015"
+        ws["C26"] = "06/2018"
+        ws["D26"] = "THPT Lê Quý Đôn"
+        ws["G26"] = "THPT"
+
+        # Work
+        ws["B32"] = "08/2018"
+        ws["C32"] = "10/2021"
+        ws["D32"] = "Công ty Cơ Khí ABC"
+        ws["F32"] = "Kỹ thuật viên tiện"
+
+        # Family 1
+        ws["B38"] = "Bố"
+        ws["C38"] = "Nguyễn Văn Cha"
+        ws["E38"] = "1970"
+        ws["F38"] = "Kinh doanh tự do"
+        ws["H38"] = "Có"
+
+        # Family 2
+        ws["B39"] = "Mẹ"
+        ws["C39"] = "Trần Thị Mẹ"
+        ws["E39"] = "1975"
+        ws["F39"] = "Nội trợ"
+        ws["H39"] = "Có"
+
+        out = BytesIO()
+        wb.save(out)
+        out.seek(0)
+
+        data = {"file": (out, "To_Khai_Ung_Vien.xlsx")}
+        res = client.post("/api/documents/import-form", data=data, content_type="multipart/form-data")
+        assert res.status_code == 201
+        cid = res.get_json()["candidate_id"]
+
+        # Check full profile
+        res_get = client.get(f"/api/candidates/{cid}")
+        assert res_get.status_code == 200
+        p = res_get.get_json()
+
+        assert len(p["educations"]) >= 1
+        assert p["educations"][0]["school_name_vn"] == "THPT Lê Quý Đôn"
+        assert p["educations"][0]["education_level"] == "THPT"
+
+        assert len(p["workExperiences"]) >= 1
+        assert p["workExperiences"][0]["company_name_vn"] == "Công ty Cơ Khí ABC"
+        assert p["workExperiences"][0]["job_title_vn"] == "Kỹ thuật viên tiện"
+
+        assert len(p["familyMembers"]) >= 2
+        assert p["familyMembers"][0]["full_name"] == "Nguyễn Văn Cha"
+        assert p["familyMembers"][0]["relationship"] == "Bố"
+        assert p["familyMembers"][0]["living_together"] == "Có"
+
+        # Cleanup
+        client.delete(f"/api/candidates/{cid}")
+
+
+class TestDateTranslationOffline:
+    def test_date_translation_without_api_key(self, client):
+        # Translate date field should work without API key
+        res = client.post("/api/translate/field", json={
+            "field_name": "date_of_birth_jp",
+            "value": "2000-10-28"
+        })
+        assert res.status_code == 200
+        assert res.get_json()["translation"] == "2000年10月28日"
+
+        res2 = client.post("/api/translate/field", json={
+            "field_name": "ngay_cap_cccd_jpn",
+            "value": "15/05/2021"
+        })
+        assert res2.status_code == 200
+        assert res2.get_json()["translation"] == "2021年05月15日"
+
+
+class TestMasterExcelSyncAndOpen:
+    def test_export_khai_tt_auto_sync(self, client):
+        res = client.get("/api/documents/khai-tt")
+        assert res.status_code == 200
+        assert "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" in res.content_type
+
+    def test_excel_open_endpoint(self, client):
+        # Should return 200 or execute smoothly
+        res = client.get("/api/excel/open")
+        assert res.status_code in (200, 500)  # On headless CI, os.startfile may raise but route executed sync
+

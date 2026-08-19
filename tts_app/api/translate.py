@@ -45,12 +45,13 @@ def translate_one():
     body       = request.get_json() or {}
     field_name = body.get("field_name", "")
     value      = body.get("value", "").strip()
-    api_key    = _get_api_key()
-
-    if not api_key:
-        return jsonify({"error": "Chưa cấu hình Gemini API Key"}), 400
     if not value:
         return jsonify({"error": "Giá trị không được để trống"}), 400
+
+    api_key = _get_api_key()
+    is_date = any(k in field_name.lower() for k in ("date", "ngay", "sinh", "dob", "birth", "nam_sinh", "issue_date"))
+    if not api_key and not is_date:
+        return jsonify({"error": "Chưa cấu hình Gemini API Key. Vào tab Cài Đặt để nhập."}), 400
 
     try:
         result = translate_single(field_name, value, api_key)

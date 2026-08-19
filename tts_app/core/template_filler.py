@@ -16,6 +16,40 @@ def _calculate_age(dob_str):
         pass
     return ""
 
+_REL_MAP_VN_TO_JP = {
+    "cha": "父", "bố": "父", "ba": "父", "bố/mẹ": "父", "father": "父",
+    "mẹ": "母", "má": "母", "mother": "母",
+    "anh": "兄", "anh trai": "兄", "brother": "兄",
+    "chị": "姉", "chị gái": "姉", "sister": "姉",
+    "em": "弟", "em trai": "弟",
+    "em gái": "妹",
+    "vợ": "妻", "wife": "妻",
+    "chồng": "夫", "husband": "夫",
+    "con": "子", "con trai": "子", "con gái": "子",
+    "ông": "祖父", "ông nội": "祖父", "ông ngoại": "祖父",
+    "bà": "祖母", "bà nội": "祖母", "bà ngoại": "祖母",
+}
+
+def _rel_to_jp(rel_str: str) -> str:
+    if not rel_str:
+        return ""
+    s = str(rel_str).strip()
+    return _REL_MAP_VN_TO_JP.get(s.lower(), s)
+
+def _fmt_period_jp(dt_str: str) -> str:
+    if not dt_str:
+        return ""
+    s = str(dt_str).strip()
+    if not s or "年" in s:
+        return s
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%Y/%m/%d", "%m/%Y", "%m-%Y", "%Y-%m", "%Y.%m"):
+        try:
+            d = datetime.strptime(s, fmt)
+            return f"{d.year}年{d.month:02d}月"
+        except ValueError:
+            pass
+    return s
+
 def set_val(ws, coord, val):
     try:
         ws[coord] = val
@@ -75,28 +109,37 @@ def fill_rirekisho_excel(candidate, template_path, output_path):
     edus = list(candidate.educations)[:3]
     for i, edu in enumerate(edus):
         row = 13 + i
-        set_val(ws, f'E{row}', f"{edu.start_date or ''}   ～ {edu.end_date or ''}")
+        s_date = _fmt_period_jp(edu.start_date)
+        e_date = _fmt_period_jp(edu.end_date)
+        period = f"{s_date}   ～ {e_date}" if s_date or e_date else ""
+        set_val(ws, f'E{row}', period)
         set_val(ws, f'K{row}', edu.school_name_jp or edu.school_name_vn or "")
 
     # Kinh nghiệm làm việc
     works = list(candidate.work_experiences)[:3]
     for i, w in enumerate(works):
         row = 17 + i
-        start = w.start_date or ""
-        end = w.end_date or "現在に至る"
-        set_val(ws, f'E{row}', f"{start}   ～ {end}")
+        s_date = _fmt_period_jp(w.start_date)
+        e_date = _fmt_period_jp(w.end_date) or "現在に至る"
+        period = f"{s_date}   ～ {e_date}" if s_date else ""
+        set_val(ws, f'E{row}', period)
         set_val(ws, f'K{row}', w.company_name_jp or w.company_name_vn or "")
         set_val(ws, f'U{row}', w.job_title_jp or w.job_title_vn or "")
 
     # Gia đình
-    fams = list(candidate.family_members)[:4]
+    fams = list(candidate.family_members)[:6]
     for i, f in enumerate(fams):
         row = 26 + i
-        set_val(ws, f'A{row}', f.relationship_jp or f.relationship_vn or "")
+        rel = f.relationship or ""
+        rel_jp = _rel_to_jp(rel)
+        set_val(ws, f'A{row}', rel_jp)
         set_val(ws, f'C{row}', f.full_name or "")
-        set_val(ws, f'K{row}', f.age or "")
-        set_val(ws, f'M{row}', "⭕" if str(f.is_living_together).lower() in ["có", "yes", "true", "1"] else "")
-        set_val(ws, f'O{row}', f.job_jp or f.job_vn or "")
+        set_val(ws, f'K{row}', str(f.age) if f.age is not None else "")
+        is_live = str(f.living_together or "").lower() in ["có", "yes", "true", "1", "o", "⭕"]
+        set_val(ws, f'M{row}', "⭕" if is_live else "")
+        set_val(ws, f'O{row}', f.occupation or f.workplace or "")
+        if hasattr(f, 'monthly_income') and f.monthly_income:
+            set_val(ws, f'X{row}', str(f.monthly_income))
 
     # Sức khoẻ & Thể chất
     if candidate.height_cm:

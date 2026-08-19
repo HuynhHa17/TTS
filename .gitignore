@@ -31,5 +31,15 @@ File_lưu.xlsx
 .DS_Store
 Thumbs.db
 
-# Logs
+# Logs & Temporary files
 *.log
+~$*
+*.tmp
+*.pdf
+test_output.pdf
+
+# Playwright & Test reports
+playwright-report/
+test-results/
+frontend/playwright-report/
+frontend/test-results/

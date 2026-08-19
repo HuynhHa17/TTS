@@ -93,18 +93,28 @@ def export_excel():
         c_dicts  = [to_dict(c) for c in candidates]
         s_dicts  = [_org_to_syndicate_dict(s) for s in syndicates]
         co_dicts = [_org_to_company_dict(co) for co in companies]
+
+        row = db.query(AppSettings).filter(AppSettings.key == "excel_output_path").first()
+        out_path = row.value if row and row.value else config.OUTPUT_FILE
+        out_path = os.path.abspath(os.path.normpath(out_path))
     finally:
         db.close()
 
     sheet_name = request.args.get("sheet", None)
-    out_path   = config.OUTPUT_FILE
-
-    export_to_excel(c_dicts, s_dicts, co_dicts, out_path, sheet_name)
+    target_send = out_path
+    try:
+        export_to_excel(c_dicts, s_dicts, co_dicts, out_path, sheet_name)
+    except PermissionError:
+        import tempfile
+        tmp = tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False)
+        target_send = tmp.name
+        tmp.close()
+        export_to_excel(c_dicts, s_dicts, co_dicts, target_send, sheet_name)
 
     return send_file(
-        out_path,
+        target_send,
         as_attachment=True,
-        download_name="File_lưu.xlsx",
+        download_name=os.path.basename(out_path) or "File_lưu.xlsx",
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
 
@@ -112,11 +122,23 @@ def export_excel():
 @export_bp.route("/export/path", methods=["GET"])
 def export_info():
     """Return output file path info."""
-    return jsonify({
-        "output_path": config.OUTPUT_FILE,
-        "cv_path":     config.CV_FILE,
-        "exists":      os.path.exists(config.OUTPUT_FILE),
-    })
+    db = get_session()
+    try:
+        row_out = db.query(AppSettings).filter(AppSettings.key == "excel_output_path").first()
+        row_cv = db.query(AppSettings).filter(AppSettings.key == "template_cv_path").first()
+        out_path = row_out.value if row_out and row_out.value else config.OUTPUT_FILE
+        cv_path = row_cv.value if row_cv and row_cv.value else config.CV_FILE
+
+        out_path = os.path.abspath(os.path.normpath(out_path))
+        cv_path = os.path.abspath(os.path.normpath(cv_path))
+
+        return jsonify({
+            "output_path": out_path,
+            "cv_path":     cv_path,
+            "exists":      os.path.exists(out_path),
+        })
+    finally:
+        db.close()
 
 
 @export_bp.route("/export/pdf/<int:cid>", methods=["GET"])

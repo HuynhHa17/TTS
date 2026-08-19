@@ -137,65 +137,99 @@ def parse_candidate_form_excel(file_bytes_or_path) -> dict:
     edu_start_row = 26
     work_start_row = 32
     family_start_row = 38
+    section_rows = {}
 
     # Scan for section header markers
-    for r in range(20, ws.max_row + 1):
+    for r in range(1, ws.max_row + 1):
         txt = _get_val(ws.cell(row=r, column=1))
         if "V. QUÁ TRÌNH HỌC VẤN" in txt or "HỌC VẤN" in txt:
             edu_start_row = r + 2
+            section_rows["edu"] = r
         elif "VI. QUÁ TRÌNH LÀM VIỆC" in txt or "LÀM VIỆC" in txt:
             work_start_row = r + 2
+            section_rows["work"] = r
         elif "VII. THÀNH VIÊN GIA ĐÌNH" in txt or "THÂN NHÂN" in txt:
             family_start_row = r + 2
+            section_rows["family"] = r
+        elif "VIII." in txt or "cam đoan" in txt.lower():
+            section_rows["footer"] = r
+
+    current_year = datetime.now().year
 
     # 5. Educations (V. Quá trình học vấn)
     educations = []
-    for r in range(edu_start_row, edu_start_row + 4):
-        school = _get_val(ws.cell(row=r, column=4))
+    edu_end_row = section_rows.get("work", work_start_row - 2)
+    for r in range(edu_start_row, edu_end_row):
         start_d = _get_val(ws.cell(row=r, column=2))
         end_d = _get_val(ws.cell(row=r, column=3))
+        school = _get_val(ws.cell(row=r, column=4))
         degree = _get_val(ws.cell(row=r, column=7))
 
-        if school or start_d:
+        if school or start_d or end_d or degree:
             educations.append({
                 "school_name_vn": school or "Trường học",
+                "school_name_jp": None,
                 "start_date": parse_date_str(start_d) if start_d else None,
                 "end_date": parse_date_str(end_d) if end_d else None,
+                "education_level": degree or None,
                 "degree_level_vn": degree or None,
             })
 
     # 6. Work Experiences (VI. Quá trình làm việc)
     work_experiences = []
-    for r in range(work_start_row, work_start_row + 4):
-        company = _get_val(ws.cell(row=r, column=4))
+    work_end_row = section_rows.get("family", family_start_row - 2)
+    for r in range(work_start_row, work_end_row):
         start_d = _get_val(ws.cell(row=r, column=2))
         end_d = _get_val(ws.cell(row=r, column=3))
+        company = _get_val(ws.cell(row=r, column=4))
         job = _get_val(ws.cell(row=r, column=6))
 
-        if company or start_d:
+        if company or start_d or end_d or job:
             work_experiences.append({
                 "company_name_vn": company or "Công ty",
+                "company_name_jp": None,
                 "start_date": parse_date_str(start_d) if start_d else None,
                 "end_date": parse_date_str(end_d) if end_d else None,
+                "job_title_vn": job or None,
+                "job_title_jp": None,
                 "job_description_vn": job or None,
+                "description": job or None,
             })
 
     # 7. Family Members (VII. Thân nhân gia đình)
     family_members = []
-    for r in range(family_start_row, family_start_row + 5):
+    family_end_row = section_rows.get("footer", ws.max_row + 1)
+    for r in range(family_start_row, family_end_row):
         rel = _get_val(ws.cell(row=r, column=2))
         name = _get_val(ws.cell(row=r, column=3))
-        byear = _get_val(ws.cell(row=r, column=5))
+        byear_raw = _get_val(ws.cell(row=r, column=5))
         job = _get_val(ws.cell(row=r, column=6))
+        income = _get_val(ws.cell(row=r, column=7)) if ws.max_column >= 7 else None
         cohab = _get_val(ws.cell(row=r, column=8))
 
-        if name:
+        if name or rel or byear_raw or job:
+            byear_num = _to_int(byear_raw)
+            calc_age = None
+            if byear_num:
+                if byear_num > 1900 and byear_num <= current_year:
+                    calc_age = current_year - byear_num
+                elif byear_num < 150:
+                    calc_age = byear_num
+
+            is_cohab = (cohab.lower() in ("có", "co", "yes", "true", "1", "o", "⭕") if cohab else True)
+
             family_members.append({
+                "relationship": rel or "Người thân",
                 "relationship_vn": rel or "Người thân",
-                "full_name": name,
-                "birth_year": _to_int(byear),
+                "full_name": name or "Thành viên",
+                "age": calc_age,
+                "birth_year": byear_num,
+                "living_together": "Có" if is_cohab else "Không",
+                "is_living_together": is_cohab,
+                "occupation": job or None,
                 "occupation_vn": job or None,
-                "is_living_together": (cohab.lower() in ("có", "co", "yes", "true", "1") if cohab else True),
+                "workplace": None,
+                "monthly_income": income or None,
             })
 
     # Identity Documents
