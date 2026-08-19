@@ -34,7 +34,12 @@ export interface Candidate {
   dental_treatment?: string;        // Có / Không
   // Người giám hộ
   guardian_name_vn?: string;
+  guardian_name_en?: string;
   guardian_name_jp?: string;
+  guardian_relationship?: string;
+  guardian_job_vn?: string;
+  guardian_job_en?: string;
+  guardian_job_jp?: string;
   guardian_address_vn?: string;
   guardian_address_jp?: string;
   guardian_phone?: string;
@@ -132,9 +137,12 @@ export interface FamilyMember {
   candidate_id: number;
   relationship: string;
   full_name: string;
+  full_name_en?: string;
   age: number;
   living_together: string;
   occupation: string;
+  occupation_en?: string;
+  occupation_jp?: string;
   workplace: string;
   monthly_income: string;
 }

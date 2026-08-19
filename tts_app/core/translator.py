@@ -4,6 +4,7 @@ Uses google-genai (new SDK, replaces google-generativeai)
 """
 import json
 import re
+import unicodedata
 from typing import Optional
 
 try:
@@ -26,6 +27,88 @@ CANDIDATE_MODELS = [
     "gemini-3.7-flash",
     "gemini-flash-latest",
 ]
+
+# Offline dictionaries
+OFFLINE_REL_EN = {
+    "cha": "FATHER", "bo": "FATHER", "bố": "FATHER", "ba": "FATHER", "bo de": "FATHER", "bố đẻ": "FATHER",
+    "me": "MOTHER", "mẹ": "MOTHER", "ma": "MOTHER", "má": "MOTHER", "me de": "MOTHER", "mẹ đẻ": "MOTHER",
+    "anh": "BROTHER", "anh trai": "ELDER BROTHER", "em trai": "YOUNGER BROTHER",
+    "chi": "SISTER", "chị": "SISTER", "chi gai": "ELDER SISTER", "chị gái": "ELDER SISTER", "em gai": "YOUNGER SISTER", "em gái": "YOUNGER SISTER",
+    "vo": "WIFE", "vợ": "WIFE", "chong": "HUSBAND", "chồng": "HUSBAND",
+    "con": "CHILD", "con trai": "SON", "con gai": "DAUGHTER", "con gái": "DAUGHTER",
+    "ong": "GRANDFATHER", "ông": "GRANDFATHER", "ba noi": "GRANDMOTHER", "bà": "GRANDMOTHER",
+    "chu": "UNCLE", "chú": "UNCLE", "bac": "UNCLE", "bác": "UNCLE", "co": "AUNT", "cô": "AUNT", "di": "AUNT", "dì": "AUNT",
+}
+
+OFFLINE_JOB_EN = {
+    "làm nông": "Farmer", "nông nghiệp": "Farmer", "nông dân": "Farmer", "trồng trọt": "Farmer", "lam nong": "Farmer",
+    "nội trợ": "Housewife", "noi tro": "Housewife",
+    "công nhân": "Worker", "cong nhan": "Worker", "lao động tự do": "Freelance worker", "lao dong tu do": "Freelance worker",
+    "công nhân may": "Garment worker", "thợ may": "Tailor", "may mặc": "Garment worker", "tho may": "Tailor",
+    "kinh doanh tự do": "Self-employed", "kinh doanh": "Business", "buôn bán": "Merchant", "kinh doanh tu do": "Self-employed",
+    "thợ xây": "Construction worker", "xây dựng": "Construction worker", "tho xay": "Construction worker",
+    "thợ hàn": "Welder", "tho han": "Welder", "thợ tiện": "Lathe operator", "thợ cơ khí": "Mechanic", "cơ khí": "Mechanic",
+    "thợ điện": "Electrician", "tho dien": "Electrician",
+    "lái xe": "Driver", "tài xế": "Driver", "lai xe": "Driver",
+    "học sinh": "Student", "sinh viên": "Student", "hoc sinh": "Student", "sinh vien": "Student",
+    "nhân viên văn phòng": "Office worker", "kế toán": "Accountant", "kỹ sư": "Engineer",
+    "giáo viên": "Teacher", "bác sĩ": "Doctor", "y tá": "Nurse",
+    "bán hàng": "Salesperson", "nhân viên bán hàng": "Salesperson",
+    "đầu bếp": "Chef", "phụ bếp": "Kitchen assistant", "bảo vệ": "Security guard",
+}
+
+OFFLINE_JOB_JP = {
+    "làm nông": "農業", "nông nghiệp": "農業", "nông dân": "農業", "trồng trọt": "農業", "lam nong": "農業",
+    "nội trợ": "主婦", "noi tro": "主婦",
+    "công nhân": "会社員", "cong nhan": "会社員", "lao động tự do": "自由業", "công nhân may": "縫製工",
+    "kinh doanh tự do": "自営業", "buôn bán": "商業", "kinh doanh": "会社員",
+    "thợ may": "縫製工", "may mặc": "縫製業", "tho may": "縫製工",
+    "thợ xây": "建設作業員", "xây dựng": "建設業", "tho xay": "建設作業員",
+    "thợ hàn": "溶接工", "thợ tiện": "旋盤工", "thợ cơ khí": "機械工", "cơ khí": "機械工",
+    "thợ điện": "電気技師", "tho dien": "電気技師",
+    "lái xe": "運転手", "tài xế": "運転手", "lai xe": "運転手",
+    "học sinh": "学生", "sinh viên": "大学生", "hoc sinh": "学生", "sinh vien": "大学生",
+    "nhân viên văn phòng": "会社員", "kế toán": "会計士", "kỹ sư": "エンジニア",
+    "giáo viên": "教師", "bác sĩ": "医師", "y tá": "看護師",
+    "bán hàng": "販売員", "nhân viên bán hàng": "販売員",
+    "đầu bếp": "調理師", "bảo vệ": "警備員",
+}
+
+
+def remove_vietnamese_accents(text: str) -> str:
+    """Chuyển chuỗi tiếng Việt có dấu thành không dấu chuẩn."""
+    if not text:
+        return ""
+    text = text.replace("Đ", "D").replace("đ", "d")
+    nfkd = unicodedata.normalize('NFKD', text)
+    return "".join([c for c in nfkd if not unicodedata.combining(c)]).strip()
+
+
+def translate_guardian_name_offline(val: str) -> str:
+    """Tự động chuyển tên người giám hộ và quan hệ sang tiếng Anh viết hoa."""
+    if not val:
+        return ""
+    s = val.strip()
+    # Check if there is relationship in parentheses e.g. "Nguyễn Văn B (Bố)" or "Nguyễn Văn B (Cha)"
+    m = re.search(r"^(.*?)\s*[\(\[\{](.+?)[\)\]\}]\s*$", s)
+    if m:
+        name_part = m.group(1).strip()
+        rel_part = m.group(2).strip().lower()
+        no_accent_name = remove_vietnamese_accents(name_part).upper()
+        rel_en = OFFLINE_REL_EN.get(rel_part, remove_vietnamese_accents(rel_part).upper())
+        return f"{no_accent_name} ({rel_en})"
+    
+    # Check if string ends with relationship separated by hyphen or slash e.g. "Nguyễn Văn B - Bố"
+    m2 = re.search(r"^(.*?)\s*[-/]\s*(.+?)$", s)
+    if m2:
+        name_part = m2.group(1).strip()
+        rel_part = m2.group(2).strip().lower()
+        if rel_part in OFFLINE_REL_EN:
+            no_accent_name = remove_vietnamese_accents(name_part).upper()
+            return f"{no_accent_name} ({OFFLINE_REL_EN[rel_part]})"
+
+    return remove_vietnamese_accents(s).upper()
+
 
 def _generate(api_key: str, prompt: str) -> str:
     """Call Gemini API with the new or legacy SDK using gemini-3.5-flash-lite."""
@@ -63,55 +146,56 @@ def _generate(api_key: str, prompt: str) -> str:
 
 
 TRANSLATE_PROMPT = """Ban la chuyen gia dich thuat ho so thuc tap sinh (TTS) Viet Nam sang tieng Nhat va tieng Anh.
-Hay dich cac truong thong tin sau theo dung yeu cau:
+Hay dich TOAN BO cac truong thong tin duoc cung cap trong JSON dau vao, khong bo sot bat ky truong nao:
 
-- ten_vnm (ten nguoi): Chuyen sang Katakana phien am chuan (vi du: NGUYEN VAN A -> グエン ヴァン アー)
-- dia_chi_vnm (dia chi): Dich sang tieng Nhat tu nhien, giu ten rieng
-- noi_sinh_vnm (noi sinh): Dich ten tinh/thanh pho sang tieng Nhat
-- noi_cap_cccd_vnm / noi_cap_hc_vnm: Dich sang tieng Nhat
-- nguoi_giam_ho_vnm (ten nguoi giam ho): Chuyen ten nguoi giam ho sang TIENG ANH viet hoa khong dau (co the kem quan he tieng Anh, vi du: "Nguyen Van B (Cha)" -> "NGUYEN VAN B (FATHER)" hoac "NGUYEN VAN B", "Tran Thi C (Me)" -> "TRAN THI C (MOTHER)")
-- ten_truong_X: Phien am hoac dich sang tieng Nhat
-- ten_dn_X: Phien am hoac dich ten cong ty sang tieng Nhat
-- nganh_nghe_vnm: Dich sang tieng Nhat chuyen nganh
+Quy tac dich:
+- ten_vnm (ten ung vien): Chuyen sang "ten_phien_am" (Katakana chuan, VD: グエン ヴァン アー) va "ten_tieng_anh" (chu in hoa khong dau, VD: NGUYEN VAN A)
+- dia_chi_vnm: Dich sang "dia_chi_jpn" (tieng Nhat tu nhien, giu nguyen dia danh)
+- noi_sinh_vnm: Dich sang "noi_sinh_jpn" (ten tinh/thanh pho sang tieng Nhat)
+- noi_cap_cccd_vnm, noi_cap_hc_vnm: Dich sang "noi_cap_cccd_jpn", "noi_cap_hc_jpn" (tieng Nhat)
+- nguoi_giam_ho_vnm: Dich sang "nguoi_giam_ho_en" (tieng Anh viet hoa khong dau kem quan he, VD: "NGUYEN VAN B (FATHER)") va "nguoi_giam_ho_jpn" (Katakana/tieng Nhat)
+- nghe_giam_ho_vnm: Dich sang "nghe_giam_ho_en" (tieng Anh, VD: "Farmer", "Housewife", "Worker") va "nghe_giam_ho_jpn" (tieng Nhat, VD: "農業", "主婦", "会社員")
+- dc_nguoi_gh_vnm: Dich sang "dc_nguoi_gh_jpn" (dia chi tieng Nhat)
+- nganh_nghe_vnm: Dich sang "nganh_nghe_jpn" (nganh nghe TTS sang tieng Nhat)
+- kn_tom_tat_vnm: Dich sang "kn_tom_tat_jpn" (VD: "3 năm" -> "３年")
+- muc_dich_vnm: Dich sang "muc_dich_jpn" (muc dich sang Nhat bang tieng Nhat)
+- ke_hoach_vnm: Dich sang "ke_hoach_jpn" (ke hoach sau khi ve nuoc bang tieng Nhat)
+- diem_manh_vnm: Dich sang "diem_manh_jpn" (tieng Nhat)
+- diem_yeu_vnm: Dich sang "diem_yeu_jpn" (tieng Nhat)
+- so_thich_vnm: Dich sang "so_thich_jpn" (tieng Nhat)
+- ten_truong_X: Dich sang "ten_truong_X_jpn" (ten truong hoc sang tieng Nhat)
+- ten_dn_X: Dich sang "ten_dn_X_jpn" (ten cong ty/doanh nghiep sang tieng Nhat)
+- chuc_vu_X: Dich sang "chuc_vu_X_jpn" (chuc vu/nghe nghiep sang tieng Nhat)
+- ky_nang_X: Dich sang "ky_nang_X_jpn" (ten ky nang nghe sang tieng Nhat)
+- tv_ten_X: Dich sang "tv_ten_X_en" (ten nguoi than tieng Anh in hoa khong dau)
+- tv_nghe_X: Dich sang "tv_nghe_X_en" (nghe nghiep nguoi than tieng Anh) va "tv_nghe_X_jpn" (nghe nghiep nguoi than tieng Nhat)
+- custom_X: Dich gia tri truong tuy chinh sang tieng Nhat "custom_X_jpn"
 
 Dau vao (JSON):
 {input_json}
 
-Tra ve JSON thuan tuy (khong co markdown, khong giai thich) voi cac key sau:
-{{
-  "ten_phien_am": "...",
-  "dia_chi_jpn": "...",
-  "noi_sinh_jpn": "...",
-  "noi_cap_cccd_jpn": "...",
-  "noi_cap_hc_jpn": "...",
-  "nguoi_giam_ho_jpn": "...",
-  "dc_nguoi_gh_jpn": "...",
-  "ten_truong_1_jpn": "...",
-  "ten_truong_2_jpn": "...",
-  "ten_truong_3_jpn": "...",
-  "ten_dn_1_jpn": "...",
-  "ten_dn_2_jpn": "...",
-  "ten_dn_3_jpn": "...",
-  "nganh_nghe_jpn": "..."
-}}
-Chi dien cac truong co du lieu dau vao, de null neu khong co.
+Tra ve JSON thuan tuy (khong co markdown ```json, khong giai thich) chua day du cac key tuong ung.
 """
 
 OUTPUT_MAP = {
-    "ten_phien_am":    "ten_phien_am",
-    "dia_chi_jpn":     "dia_chi_jpn",
-    "noi_sinh_jpn":    "noi_sinh_jpn",
-    "noi_cap_cccd_jpn":"noi_cap_cccd_jpn",
-    "noi_cap_hc_jpn":  "noi_cap_hc_jpn",
-    "nguoi_giam_ho_jpn":"nguoi_giam_ho_jpn",
-    "dc_nguoi_gh_jpn": "dc_nguoi_gh_jpn",
-    "ten_truong_1_jpn":"ten_truong_1",
-    "ten_truong_2_jpn":"ten_truong_2",
-    "ten_truong_3_jpn":"ten_truong_3",
-    "ten_dn_1_jpn":    "ten_dn_1",
-    "ten_dn_2_jpn":    "ten_dn_2",
-    "ten_dn_3_jpn":    "ten_dn_3",
-    "nganh_nghe_jpn":  "nganh_nghe_jpn",
+    "ten_phien_am":        "ten_phien_am",
+    "ten_tieng_anh":       "full_name_eng",
+    "dia_chi_jpn":         "dia_chi_jpn",
+    "noi_sinh_jpn":        "noi_sinh_jpn",
+    "noi_cap_cccd_jpn":    "noi_cap_cccd_jpn",
+    "noi_cap_hc_jpn":      "noi_cap_hc_jpn",
+    "nguoi_giam_ho_en":    "guardian_name_en",
+    "nguoi_giam_ho_jpn":   "guardian_name_jp",
+    "nghe_giam_ho_en":     "guardian_job_en",
+    "nghe_giam_ho_jpn":    "guardian_job_jp",
+    "dc_nguoi_gh_jpn":     "dc_nguoi_gh_jpn",
+    "nganh_nghe_jpn":      "nganh_nghe_jpn",
+    "kn_tom_tat_jpn":      "kn_tom_tat_jpn",
+    "muc_dich_jpn":        "muc_dich_jpn",
+    "ke_hoach_jpn":        "ke_hoach_jpn",
+    "diem_manh_jpn":       "diem_manh_jpn",
+    "diem_yeu_jpn":        "diem_yeu_jpn",
+    "so_thich_jpn":        "so_thich_jpn",
 }
 
 
@@ -135,6 +219,17 @@ def translate_fields(fields: dict, api_key: str) -> dict:
         val = raw.get(out_key)
         if val and val != "null":
             result[model_key] = val
+    
+    # Passthrough dynamic list keys (e.g. ten_truong_1_jpn, ten_dn_1_jpn, tv_nghe_1_en, etc.)
+    for k, val in raw.items():
+        if val and val != "null":
+            result[k] = val
+            # Also normalize aliases e.g. ten_truong_1_jpn -> ten_truong_1
+            if k.endswith("_jpn"):
+                base_k = k[:-4]
+                if base_k not in result:
+                    result[base_k] = val
+
     return result
 
 
@@ -186,6 +281,8 @@ def format_date_to_jp(value: str) -> Optional[str]:
 def translate_single(field_name: str, value: str, api_key: str = "") -> Optional[str]:
     fn_lower = field_name.lower()
     val_strip = value.strip() if value else ""
+    if not val_strip:
+        return ""
 
     # Direct date conversion if it's a date field or date string (does not require api_key)
     if any(k in fn_lower for k in ("date", "ngay", "sinh", "dob", "birth", "nam_sinh", "issue_date")):
@@ -194,11 +291,11 @@ def translate_single(field_name: str, value: str, api_key: str = "") -> Optional
             return jp_date
 
     # Guardian name English translation
-    if "giam_ho" in fn_lower or "guardian" in fn_lower:
+    if any(k in fn_lower for k in ("giam_ho_en", "guardian_name_en", "guardian_en", "nguoi_giam_ho_en", "guardian_name")):
         if not api_key:
-            # Fallback simple uppercase without accents if no API key
-            return val_strip.upper()
-        prompt = f"""Chuyen ten nguoi giam ho sau sang tieng Anh viet hoa khong dau (neu co quan he nhu Cha, Me thi dich quan he sang tieng Anh nhu FATHER, MOTHER):
+            return translate_guardian_name_offline(val_strip)
+        try:
+            prompt = f"""Chuyen ten nguoi giam ho sau sang tieng Anh viet hoa khong dau (neu co quan he nhu Cha, Me thi dich quan he sang tieng Anh nhu FATHER, MOTHER):
 Gia tri: {val_strip}
 Vi du:
 - "Nguyen Van A (Cha)" -> "NGUYEN VAN A (FATHER)"
@@ -206,7 +303,61 @@ Vi du:
 - "Tran Van C" -> "TRAN VAN C"
 
 Chi tra ve ten tieng Anh viet hoa, khong giai thich."""
-        return _generate(api_key, prompt)
+            return _generate(api_key, prompt)
+        except Exception:
+            return translate_guardian_name_offline(val_strip)
+
+    # Job / Occupation English translation
+    if any(k in fn_lower for k in ("job_en", "occupation_en", "nghe_en", "nghe_nghiep_en", "guardian_job_en", "nghe_giam_ho_en")):
+        val_lower = val_strip.lower()
+        if val_lower in OFFLINE_JOB_EN:
+            return OFFLINE_JOB_EN[val_lower]
+        if not api_key:
+            return val_strip.capitalize()
+        try:
+            prompt = f"""Dich nghe nghiep / cong viec sau tu tieng Viet sang TIENG ANH ngan gon, chuan xac cho ho so lao dong/TTS:
+Gia tri: {val_strip}
+Vi du:
+- "Làm nông" -> "Farmer"
+- "Nội trợ" -> "Housewife"
+- "Thợ may" -> "Tailor"
+- "Công nhân" -> "Worker"
+- "Kinh doanh tự do" -> "Self-employed"
+- "Học sinh" -> "Student"
+- "Thợ xây" -> "Construction worker"
+- "Lái xe" -> "Driver"
+- "Nhân viên văn phòng" -> "Office worker"
+
+Chi tra ve ten nghe nghiep bang tieng Anh, khong giai thich."""
+            return _generate(api_key, prompt)
+        except Exception:
+            return OFFLINE_JOB_EN.get(val_lower, val_strip.capitalize())
+
+    # Job / Occupation Japanese translation
+    if any(k in fn_lower for k in ("job_jp", "occupation_jp", "nghe_jp", "nghe_nghiep_jp", "guardian_job_jp", "nghe_giam_ho_jp")):
+        val_lower = val_strip.lower()
+        if val_lower in OFFLINE_JOB_JP:
+            return OFFLINE_JOB_JP[val_lower]
+        if not api_key:
+            return OFFLINE_JOB_JP.get(val_lower, val_strip)
+        try:
+            prompt = f"""Dich nghe nghiep / cong viec sau tu tieng Viet sang TIENG NHAT chuan xac cho ho so TTS:
+Gia tri: {val_strip}
+Vi du:
+- "Làm nông" -> "農業"
+- "Nội trợ" -> "主婦"
+- "Thợ may" -> "縫製"
+- "Công nhân" -> "会社員"
+- "Kinh doanh tự do" -> "自営業"
+- "Học sinh" -> "学生"
+- "Thợ xây" -> "建設作業員"
+- "Lái xe" -> "運転手"
+- "Nhân viên văn phòng" -> "会社員"
+
+Chi tra ve ten nghe nghiep bang tieng Nhat, khong giai thich."""
+            return _generate(api_key, prompt)
+        except Exception:
+            return OFFLINE_JOB_JP.get(val_lower, val_strip)
 
     if not api_key:
         raise ValueError("Chưa cấu hình Gemini API Key. Vào tab Cài Đặt để nhập.")

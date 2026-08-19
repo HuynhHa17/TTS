@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import type { Candidate } from '../types';
-import { Search, ChevronLeft, ChevronRight, Trash2, Plus, FileDown, CheckSquare, Square, FileArchive, Edit, FileText, FileSpreadsheet } from 'lucide-react';
+import { Search, Trash2, Plus, FileDown, CheckSquare, Square, FileArchive, Edit, FileText, FileSpreadsheet } from 'lucide-react';
 import { formatDateVN } from '../utils/dateFormat';
+import { Pagination } from './Pagination';
 
 interface CandidateListProps {
   candidates: Candidate[];
@@ -17,8 +18,6 @@ interface CandidateListProps {
   isLoading: boolean;
 }
 
-const ITEMS_PER_PAGE = 12;
-
 export function CandidateList({
   candidates,
   selectedIds,
@@ -33,6 +32,7 @@ export function CandidateList({
   isLoading
 }: CandidateListProps) {
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(12);
   const [searchTerm, setSearchTerm] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -42,10 +42,10 @@ export function CandidateList({
     return () => clearTimeout(timer);
   }, []);
 
-  // Reset to page 1 if candidates list changes
+  // Reset to page 1 if candidates list, pageSize, or search changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [candidates.length, searchTerm]);
+  }, [candidates.length, searchTerm, pageSize]);
 
   if (isLoading) return <div className="p-8 font-bold text-center">Đang tải danh sách ứng viên...</div>;
 
@@ -57,9 +57,8 @@ export function CandidateList({
     (c.phone || '').includes(s)
   );
 
-  const totalPages = Math.ceil(filteredCandidates.length / ITEMS_PER_PAGE) || 1;
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const paginatedCandidates = filteredCandidates.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * pageSize;
+  const paginatedCandidates = filteredCandidates.slice(startIndex, startIndex + pageSize);
 
   const isAllSelected = paginatedCandidates.length > 0 && paginatedCandidates.every(c => selectedIds.includes(c.id));
 
@@ -299,62 +298,15 @@ export function CandidateList({
       )}
 
       {/* Pagination Controls */}
-      {totalPages > 1 && (
-        <div className="flex justify-center items-center gap-2 mt-6">
-          <button
-            onClick={() => setCurrentPage(1)}
-            disabled={currentPage === 1}
-            className="px-2.5 py-1.5 border-2 border-[#1A1A1A] bg-white rounded-lg shadow-[2px_2px_0_0_#1A1A1A] disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#FFD700] transition-colors text-xs font-black"
-          >
-            «
-          </button>
-          <button
-            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-            disabled={currentPage === 1}
-            className="p-1.5 border-2 border-[#1A1A1A] bg-white rounded-lg shadow-[2px_2px_0_0_#1A1A1A] disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#FFD700] transition-colors"
-          >
-            <ChevronLeft size={16} />
-          </button>
-
-          <div className="flex items-center gap-1">
-            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-              let page: number;
-              if (totalPages <= 5) page = i + 1;
-              else if (currentPage <= 3) page = i + 1;
-              else if (currentPage >= totalPages - 2) page = totalPages - 4 + i;
-              else page = currentPage - 2 + i;
-              return (
-                <button
-                  key={page}
-                  onClick={() => setCurrentPage(page)}
-                  className={`w-8 h-8 text-xs font-black rounded-lg border-2 transition-all ${
-                    page === currentPage
-                      ? 'bg-[#1A1A1A] text-white border-[#1A1A1A] shadow-[2px_2px_0_0_#555]'
-                      : 'bg-white border-[#DDD] hover:border-[#1A1A1A] hover:bg-[#FFD700]'
-                  }`}
-                >
-                  {page}
-                </button>
-              );
-            })}
-          </div>
-
-          <button
-            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-            disabled={currentPage === totalPages}
-            className="p-1.5 border-2 border-[#1A1A1A] bg-white rounded-lg shadow-[2px_2px_0_0_#1A1A1A] disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#FFD700] transition-colors"
-          >
-            <ChevronRight size={16} />
-          </button>
-          <button
-            onClick={() => setCurrentPage(totalPages)}
-            disabled={currentPage === totalPages}
-            className="px-2.5 py-1.5 border-2 border-[#1A1A1A] bg-white rounded-lg shadow-[2px_2px_0_0_#1A1A1A] disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#FFD700] transition-colors text-xs font-black"
-          >
-            »
-          </button>
-        </div>
-      )}
+      <Pagination
+        currentPage={currentPage}
+        totalItems={filteredCandidates.length}
+        pageSize={pageSize}
+        onPageChange={setCurrentPage}
+        onPageSizeChange={setPageSize}
+        pageSizeOptions={[12, 24, 48, 96]}
+        itemLabel="hồ sơ"
+      />
     </div>
   );
 }

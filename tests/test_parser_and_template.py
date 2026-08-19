@@ -176,15 +176,29 @@ class TestFormTemplateTextFormat:
         assert ws["F8"].number_format == "@"
         assert ws["F13"].number_format == "@"
 
-    def test_form_parser_reads_integer_identity_number_as_clean_string(self):
+    def test_form_parser_preserves_and_normalizes_leading_zero(self):
         from core.form_template import create_candidate_form_workbook
-        from core.form_parser import parse_candidate_form_excel
+        from core.form_parser import parse_candidate_form_excel, normalize_phone_str, normalize_id_number
+        
+        # Test helper functions
+        assert normalize_phone_str("0987654321") == "0987654321"
+        assert normalize_phone_str("987654321") == "0987654321"  # lost leading 0 restored
+        assert normalize_phone_str(987654321) == "0987654321"
+        assert normalize_phone_str("84987654321") == "0987654321"
+        
+        assert normalize_id_number("038096001234", "CCCD") == "038096001234"
+        assert normalize_id_number("38096001234", "CCCD") == "038096001234"  # 11 digits -> 12 digits with leading 0
+        assert normalize_id_number(38096001234, "CCCD") == "038096001234"
+        assert normalize_id_number("12345678", "CMND") == "012345678"  # 8 digits -> 9 digits with leading 0
+
         wb = create_candidate_form_workbook()
         ws = wb.active
 
         ws["B4"] = "NGUYỄN VĂN A"
-        ws["B11"] = 38096001234  # integer or float from Excel without losing digits
+        ws["F5"] = 912345678  # Phone stored as int in Excel
+        ws["B11"] = 38096001234  # 11-digit CCCD stored as int in Excel
         ws["B12"] = "C1234567"
+        ws["F13"] = 901234567  # Guardian phone stored as int in Excel
 
         with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
             tmp_path = tmp.name
@@ -192,10 +206,17 @@ class TestFormTemplateTextFormat:
         try:
             wb.save(tmp_path)
             res = parse_candidate_form_excel(tmp_path)
+            
+            # Check candidate phone numbers preserve leading 0
+            assert res["candidate"]["phone"] == "0912345678"
+            assert res["candidate"]["guardian_phone"] == "0901234567"
+
+            # Check CCCD preserves leading 0
             identity_docs = res["identityDocuments"]
             cccd_doc = next((d for d in identity_docs if d.get("document_type") == "CCCD" or d.get("doc_type") == "CCCD"), None)
             assert cccd_doc is not None
-            assert cccd_doc["document_number"] == "38096001234"
+            assert cccd_doc["document_number"] == "038096001234"
+            assert len(cccd_doc["document_number"]) == 12
         finally:
             if os.path.exists(tmp_path):
                 os.remove(tmp_path)

@@ -176,7 +176,9 @@ def build_syndicate_sheet(ws, syndicates: list):
             val = s.get(f) if isinstance(s, dict) else getattr(s, f, None)
             if f == "id":
                 val = r - 2
-            ws.cell(row=r, column=c, value=val or "")
+            cell = ws.cell(row=r, column=c, value=str(val) if val is not None else "")
+            if f == "so_dien_thoai":
+                cell.number_format = "@"
         _style_data_row(ws, r, len(fields), r % 2 == 0)
 
 
@@ -204,7 +206,9 @@ def build_company_sheet(ws, companies: list):
             val = co.get(f) if isinstance(co, dict) else getattr(co, f, None)
             if f == "id":
                 val = r - 2
-            ws.cell(row=r, column=c, value=val or "")
+            cell = ws.cell(row=r, column=c, value=str(val) if val is not None else "")
+            if f == "so_dien_thoai":
+                cell.number_format = "@"
         _style_data_row(ws, r, len(fields), r % 2 == 0)
 
 

@@ -9,6 +9,8 @@ from io import BytesIO
 from typing import Optional
 import openpyxl
 
+from core.translator import translate_guardian_name_offline, OFFLINE_JOB_EN, OFFLINE_JOB_JP
+
 
 def parse_date_str(val) -> Optional[str]:
     """Chuyển đổi các định dạng ngày tháng sang chuỗi chuẩn DD/MM/YYYY hoặc MM/YYYY."""
@@ -49,11 +51,53 @@ def _get_val(cell):
         return val.strftime("%d/%m/%Y")
     if isinstance(val, float):
         if val.is_integer():
-            return str(int(val)).strip()
+            return f"{int(val)}"
         return str(val).strip()
     if isinstance(val, int):
         return str(val).strip()
     return str(val).strip()
+
+
+def normalize_phone_str(val) -> Optional[str]:
+    """Chuẩn hóa chuỗi số điện thoại dạng Text, bảo toàn số 0 đầu nếu Excel lưu dạng số."""
+    if val is None:
+        return None
+    s = str(val).strip()
+    if not s:
+        return None
+    if s.endswith(".0"):
+        s = s[:-2]
+    cleaned = re.sub(r'[\s\.\-]', '', s)
+    # Nếu là 9 chữ số bắt đầu bằng các đầu số di động/bàn thông dụng (2,3,5,7,8,9), tự động bù số 0 đầu
+    if len(cleaned) == 9 and cleaned[0] in "235789":
+        return "0" + cleaned
+    # Nếu có tiền tố 84 / +84
+    if len(cleaned) == 11 and cleaned.startswith("84") and cleaned[2] in "235789":
+        return "0" + cleaned[2:]
+    if len(cleaned) == 12 and cleaned.startswith("+84") and cleaned[3] in "235789":
+        return "0" + cleaned[3:]
+    return s
+
+
+def normalize_id_number(val, doc_type: str = "CCCD") -> Optional[str]:
+    """Chuẩn hóa số giấy tờ CCCD/CMND/Hộ chiếu dạng Text, bảo toàn số 0 đầu."""
+    if val is None:
+        return None
+    s = str(val).strip()
+    if not s:
+        return None
+    if s.endswith(".0"):
+        s = s[:-2]
+    cleaned = re.sub(r'[\s\.\-]', '', s)
+    # CCCD chuẩn 12 số: nếu 11 chữ số thì do Excel làm mất số 0 đầu
+    if doc_type.upper() == "CCCD" or len(cleaned) == 11:
+        if len(cleaned) == 11 and cleaned.isdigit():
+            return "0" + cleaned
+    # CMND chuẩn 9 số: nếu 8 chữ số thì bù 0 đầu
+    if doc_type.upper() == "CMND" or len(cleaned) == 8:
+        if len(cleaned) == 8 and cleaned.isdigit():
+            return "0" + cleaned
+    return s
 
 
 def parse_candidate_form_excel(file_bytes_or_path) -> dict:
@@ -74,7 +118,7 @@ def parse_candidate_form_excel(file_bytes_or_path) -> dict:
     date_of_birth = parse_date_str(raw_dob) if raw_dob else None
 
     gender = _get_val(ws["D5"]) or "Nam"
-    phone = _get_val(ws["F5"])
+    phone = normalize_phone_str(_get_val(ws["F5"]))
 
     marital_status = _get_val(ws["B6"]) or "Độc thân"
     has_children = _get_val(ws["D6"])
@@ -89,7 +133,7 @@ def parse_candidate_form_excel(file_bytes_or_path) -> dict:
     address_vn = _get_val(ws["B9"])
 
     # 2. Identity Docs & Guardian (Rows 11-14)
-    cccd_num = _get_val(ws["B11"])
+    cccd_num = normalize_id_number(_get_val(ws["B11"]), "CCCD")
     cccd_date = parse_date_str(_get_val(ws["D11"])) if _get_val(ws["D11"]) else None
     cccd_place = _get_val(ws["F11"])
 
@@ -99,7 +143,7 @@ def parse_candidate_form_excel(file_bytes_or_path) -> dict:
 
     guardian_name = _get_val(ws["B13"])
     guardian_rel = _get_val(ws["D13"])
-    guardian_phone = _get_val(ws["F13"])
+    guardian_phone = normalize_phone_str(_get_val(ws["F13"]))
     guardian_addr = _get_val(ws["B14"])
 
     # 3. Physical & Health (Rows 16-18)
@@ -223,6 +267,8 @@ def parse_candidate_form_excel(file_bytes_or_path) -> dict:
                     calc_age = byear_num
 
             is_cohab = (cohab.lower() in ("có", "co", "yes", "true", "1", "o", "⭕") if cohab else True)
+            job_en = OFFLINE_JOB_EN.get(job.lower(), None) if job else None
+            job_jp = OFFLINE_JOB_JP.get(job.lower(), None) if job else None
 
             family_members.append({
                 "relationship": rel or "Người thân",
@@ -234,6 +280,8 @@ def parse_candidate_form_excel(file_bytes_or_path) -> dict:
                 "is_living_together": is_cohab,
                 "occupation": job or None,
                 "occupation_vn": job or None,
+                "occupation_en": job_en,
+                "occupation_jp": job_jp,
                 "workplace": None,
                 "monthly_income": income or None,
             })
@@ -261,6 +309,23 @@ def parse_candidate_form_excel(file_bytes_or_path) -> dict:
             "is_primary": False,
         })
 
+    # Find guardian's job from family members if available
+    guardian_job_vn = None
+    guardian_job_en = None
+    guardian_job_jp = None
+    if guardian_rel:
+        for fm in family_members:
+            if fm.get("relationship") and fm.get("relationship").lower() in (guardian_rel.lower(), f"{guardian_rel.lower()} đẻ"):
+                guardian_job_vn = fm.get("occupation")
+                guardian_job_en = fm.get("occupation_en")
+                guardian_job_jp = fm.get("occupation_jp")
+                break
+
+    guardian_name_en_str = None
+    if guardian_name:
+        raw_g_str = f"{guardian_name} ({guardian_rel})" if guardian_rel else guardian_name
+        guardian_name_en_str = translate_guardian_name_offline(raw_g_str)
+
     candidate_dict = {
         "full_name_vn": full_name_vn,
         "full_name_katakana": full_name_katakana or None,
@@ -278,7 +343,11 @@ def parse_candidate_form_excel(file_bytes_or_path) -> dict:
         "address_vn": address_vn or None,
         "guardian_name_vn": guardian_name or None,
         "guardian_name": guardian_name or None,
+        "guardian_name_en": guardian_name_en_str,
         "guardian_relationship": guardian_rel or None,
+        "guardian_job_vn": guardian_job_vn,
+        "guardian_job_en": guardian_job_en,
+        "guardian_job_jp": guardian_job_jp,
         "guardian_address_vn": guardian_addr or None,
         "guardian_address": guardian_addr or None,
         "guardian_phone": guardian_phone or None,

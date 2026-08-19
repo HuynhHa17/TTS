@@ -231,7 +231,7 @@ def _sync_excel():
 
                 text_cols = {2, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 29, 60}
                 for col_idx, val in enumerate(row_data, start=1):
-                    cell = ws.cell(row=stt + 1, column=col_idx, value=val)
+                    cell = ws.cell(row=stt + 1, column=col_idx, value=str(val) if val is not None else "")
                     if col_idx in text_cols:
                         cell.number_format = "@"
 

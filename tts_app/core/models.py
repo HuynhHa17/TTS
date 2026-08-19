@@ -46,7 +46,12 @@ class Candidate(Base):
     dental_treatment = Column(String(10), nullable=True)       # 有/無
     # Người giám hộ
     guardian_name_vn = Column(String(200), nullable=True)
+    guardian_name_en = Column(String(200), nullable=True)
     guardian_name_jp = Column(String(200), nullable=True)
+    guardian_relationship = Column(String(100), nullable=True) # Quan hệ (Bố/Mẹ/...)
+    guardian_job_vn = Column(String(200), nullable=True)
+    guardian_job_en = Column(String(200), nullable=True)
+    guardian_job_jp = Column(String(200), nullable=True)
     guardian_address_vn = Column(String(300), nullable=True)
     guardian_address_jp = Column(String(300), nullable=True)
     guardian_phone = Column(String(50), nullable=True)
@@ -156,9 +161,12 @@ class FamilyMember(Base):
     candidate_id = Column(Integer, ForeignKey('candidates.id'), nullable=False)
     relationship = Column(String(50), nullable=True)
     full_name = Column(String(100), nullable=True)
+    full_name_en = Column(String(100), nullable=True)
     age = Column(Integer, nullable=True)
     living_together = Column(String(50), nullable=True)
     occupation = Column(String(100), nullable=True)
+    occupation_en = Column(String(100), nullable=True)
+    occupation_jp = Column(String(100), nullable=True)
     workplace = Column(String(200), nullable=True)
     monthly_income = Column(String(50), nullable=True)
 

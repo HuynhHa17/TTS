@@ -72,7 +72,7 @@ class TestDateFormattingToJapanese:
 
 
 class TestTranslateSingleOffline:
-    """2. Kiểm tra translate_single không cần Gemini API Key cho trường ngày tháng / người giám hộ"""
+    """2. Kiểm tra translate_single không cần Gemini API Key cho trường ngày tháng / người giám hộ / nghề nghiệp"""
 
     def test_date_fields_offline_translation(self):
         assert translate_single("date_of_birth", "2000-10-28") == "2000年10月28日"
@@ -81,8 +81,20 @@ class TestTranslateSingleOffline:
         assert translate_single("ngay_cap_cccd", "10/05/2021") == "2021年05月10日"
 
     def test_guardian_name_fallback_offline(self):
-        res = translate_single("guardian_name", "Nguyen Van A (Cha)", api_key="")
-        assert "NGUYEN VAN A" in res
+        res = translate_single("guardian_name_en", "Nguyễn Văn B (Bố)", api_key="")
+        assert res == "NGUYEN VAN B (FATHER)"
+
+        res2 = translate_single("guardian_name_en", "Trần Thị C (Mẹ)", api_key="")
+        assert res2 == "TRAN THI C (MOTHER)"
+
+    def test_job_en_and_jp_offline_translation(self):
+        assert translate_single("job_en", "Làm nông", api_key="") == "Farmer"
+        assert translate_single("guardian_job_en", "Nội trợ", api_key="") == "Housewife"
+        assert translate_single("occupation_en", "Công nhân", api_key="") == "Worker"
+
+        assert translate_single("job_jp", "Làm nông", api_key="") == "農業"
+        assert translate_single("guardian_job_jp", "Nội trợ", api_key="") == "主婦"
+        assert translate_single("occupation_jp", "Công nhân", api_key="") == "会社員"
 
     def test_text_field_without_key_raises_error(self):
         with pytest.raises(ValueError) as exc:

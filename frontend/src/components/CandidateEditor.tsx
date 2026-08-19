@@ -1,6 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Zap, Trash2, Calendar } from 'lucide-react';
-import { toISODate, toJapaneseDate, formatDateVN } from '../utils/dateFormat';
+import {
+  toISODate,
+  toJapaneseDate,
+  formatDateVN,
+  removeVietnameseAccents,
+  translateGuardianNameOffline,
+  OFFLINE_JOBS_EN,
+  OFFLINE_JOBS_JP,
+} from '../utils/dateFormat';
 import type {
   FullCandidateProfile,
   Candidate,
@@ -56,7 +64,12 @@ const blankCandidate = (): Candidate => ({
   chronic_disease_name: '',
   dental_treatment: 'Không',
   guardian_name_vn: '',
+  guardian_name_en: '',
   guardian_name_jp: '',
+  guardian_relationship: '',
+  guardian_job_vn: '',
+  guardian_job_en: '',
+  guardian_job_jp: '',
   guardian_address_vn: '',
   guardian_address_jp: '',
   guardian_phone: '',
@@ -97,8 +110,8 @@ const blankWork = (): WorkExperience => ({
   job_title_vn: '', job_title_jp: '', description: '',
 });
 const blankFamily = (): FamilyMember => ({
-  candidate_id: 0, relationship: '', full_name: '',
-  age: 0, living_together: '', occupation: '', workplace: '', monthly_income: '',
+  candidate_id: 0, relationship: '', full_name: '', full_name_en: '',
+  age: 0, living_together: '', occupation: '', occupation_en: '', occupation_jp: '', workplace: '', monthly_income: '',
 });
 const blankSkill = (): SkillExperience => ({
   candidate_id: 0, skill_name_vn: '', skill_name_jp: '',
@@ -106,21 +119,24 @@ const blankSkill = (): SkillExperience => ({
 });
 
 // ─── UI atoms ─────────────────────────────────────────────────────
-function Field({ label, jp, children }: { label: string; jp?: boolean; children: React.ReactNode }) {
+function Field({ label, jp, en, children }: { label: string; jp?: boolean; en?: boolean; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5">
       <label className="text-xs font-bold uppercase tracking-wider text-[#444]">
-        {label}{jp && <span className="ml-1 text-[#7C3AED] font-extrabold text-[10px]">JP</span>}
+        {label}
+        {jp && <span className="ml-1 text-[#7C3AED] font-extrabold text-[10px]">JP</span>}
+        {en && <span className="ml-1 text-[#0284C7] font-extrabold text-[10px]">EN</span>}
       </label>
       {children}
     </div>
   );
 }
 
-function Inp({ value, onChange, placeholder = '', type = 'text', jp = false, rows }:
-  { value: string | number | undefined; onChange: (v: string) => void; placeholder?: string; type?: string; jp?: boolean; rows?: number }) {
+function Inp({ value, onChange, placeholder = '', type = 'text', jp = false, en = false, rows }:
+  { value: string | number | undefined; onChange: (v: string) => void; placeholder?: string; type?: string; jp?: boolean; en?: boolean; rows?: number }) {
   const cls = `artistic-input py-2 px-3 font-medium w-full text-sm
-    ${jp ? 'border-[#7C3AED] bg-[#FAF8FF] focus:shadow-[3px_3px_0_#7C3AED]' : ''}`;
+    ${jp ? 'border-[#7C3AED] bg-[#FAF8FF] focus:shadow-[3px_3px_0_#7C3AED]' : ''}
+    ${en ? 'border-[#0284C7] bg-[#F0F9FF] focus:shadow-[3px_3px_0_#0284C7]' : ''}`;
   if (rows) {
     return (
       <textarea rows={rows} value={value ?? ''} onChange={e => onChange(e.target.value)}
@@ -193,7 +209,7 @@ function Inp({ value, onChange, placeholder = '', type = 'text', jp = false, row
   );
 }
 
-function Sel({ value, onChange, opts }: { value: string; onChange: (v: string) => void; opts: string[] | { label: string; value: string }[] }) {
+function Sel({ value, onChange, opts }: { value: string | undefined; onChange: (v: string) => void; opts: string[] | { label: string; value: string }[] }) {
   const options = (opts as unknown[]).map((o): { label: string; value: string } =>
     typeof o === 'string' ? { label: o, value: o } : o as { label: string; value: string }
   );
@@ -292,62 +308,184 @@ export function CandidateEditor({ profile, onSave, onBack, onDelete, onDownloadR
   // ── Translate all VN fields at once ────────────────────────
   const translateAll = useCallback(async () => {
     setTranslatingAll(true);
-    showToast('🔄 Đang dịch toàn bộ...', 'info');
+    showToast('🔄 Đang dịch toàn bộ thông tin hồ sơ...', 'info');
+
+    // 1. Chuẩn bị payload gửi Gemini
     const fields: Record<string, string> = {};
-    if (cand.full_name_vn)       fields.ten_vnm            = cand.full_name_vn;
-    if (cand.address_vn)         fields.dia_chi_vnm        = cand.address_vn;
-    if (cand.birthplace_vn)      fields.noi_sinh_vnm       = cand.birthplace_vn;
-    if (cand.guardian_name_vn)   fields.nguoi_giam_ho_vnm  = cand.guardian_name_vn;
-    if (cand.guardian_address_vn)fields.dc_nguoi_gh_vnm    = cand.guardian_address_vn;
-    if (internshipFieldVn)       fields.nganh_nghe_vnm     = internshipFieldVn;
-    edus.forEach((e, i) => { if (e.school_name_vn) fields[`ten_truong_${i + 1}`] = e.school_name_vn; });
-    works.forEach((w, i) => { if (w.company_name_vn) fields[`ten_dn_${i + 1}`] = w.company_name_vn; });
-    docs.forEach(d => {
-      if (d.document_type === 'CCCD' && d.issue_place_vn) fields.noi_cap_cccd_vnm = d.issue_place_vn;
-      if (d.document_type === 'Passport' && d.issue_place_vn) fields.noi_cap_hc_vnm = d.issue_place_vn;
+    if (cand.full_name_vn)        fields.ten_vnm           = cand.full_name_vn;
+    if (cand.address_vn)          fields.dia_chi_vnm       = cand.address_vn;
+    if (cand.birthplace_vn)       fields.noi_sinh_vnm      = cand.birthplace_vn;
+    if (cand.guardian_name_vn)    fields.nguoi_giam_ho_vnm = cand.guardian_name_vn;
+    if (cand.guardian_job_vn)     fields.nghe_giam_ho_vnm  = cand.guardian_job_vn;
+    if (cand.guardian_address_vn) fields.dc_nguoi_gh_vnm   = cand.guardian_address_vn;
+    if (internshipFieldVn)        fields.nganh_nghe_vnm    = internshipFieldVn;
+    if (cand.skill_summary_vn)    fields.kn_tom_tat_vnm    = cand.skill_summary_vn;
+    if (cand.purpose_to_japan_vn) fields.muc_dich_vnm      = cand.purpose_to_japan_vn;
+    if (cand.plan_after_return_vn)fields.ke_hoach_vnm     = cand.plan_after_return_vn;
+    if (cand.strengths_vn)        fields.diem_manh_vnm     = cand.strengths_vn;
+    if (cand.weaknesses_vn)       fields.diem_yeu_vnm      = cand.weaknesses_vn;
+    if (cand.hobbies_vn)          fields.so_thich_vnm      = cand.hobbies_vn;
+
+    // Học vấn
+    edus.forEach((e, i) => {
+      if (e.school_name_vn) fields[`ten_truong_${i + 1}`] = e.school_name_vn;
     });
-    if (!Object.keys(fields).length) { showToast('Chưa có trường nào để dịch', 'info'); setTranslatingAll(false); return; }
-    try {
-      const res = await fetch('/api/translate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fields }),
+
+    // Quá trình làm việc
+    works.forEach((w, i) => {
+      if (w.company_name_vn) fields[`ten_dn_${i + 1}`] = w.company_name_vn;
+      if (w.job_title_vn)    fields[`chuc_vu_${i + 1}`] = w.job_title_vn;
+    });
+
+    // Kỹ năng
+    skills.forEach((s, i) => {
+      if (s.skill_name_vn) fields[`ky_nang_${i + 1}`] = s.skill_name_vn;
+    });
+
+    // Thành viên gia đình
+    family.forEach((fm, i) => {
+      if (fm.full_name)  fields[`tv_ten_${i + 1}`]  = fm.full_name;
+      if (fm.occupation) fields[`tv_nghe_${i + 1}`] = fm.occupation;
+    });
+
+    // Giấy tờ
+    docs.forEach((d, i) => {
+      if (d.document_type === 'CCCD' && d.issue_place_vn) fields.noi_cap_cccd_vnm = d.issue_place_vn;
+      else if (d.document_type === 'Passport' && d.issue_place_vn) fields.noi_cap_hc_vnm = d.issue_place_vn;
+      else if (d.issue_place_vn) fields[`noi_cap_doc_${i + 1}`] = d.issue_place_vn;
+    });
+
+    // Trường tùy chỉnh
+    customFieldDefs.forEach(f => {
+      if (f.requireJp && cand.custom_fields?.[f.id]) {
+        fields[`custom_${f.id}`] = cand.custom_fields[f.id];
+      }
+    });
+
+    let t: Record<string, string> = {};
+    let isAiSuccess = false;
+
+    if (Object.keys(fields).length > 0) {
+      try {
+        const res = await fetch('/api/translate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fields }),
+        });
+        const data = await res.json();
+        if (res.ok && data.translations) {
+          t = data.translations as Record<string, string>;
+          isAiSuccess = true;
+        }
+      } catch (err) {
+        console.warn('Translate API call warning, falling back to offline normalization:', err);
+      }
+    }
+
+    // 2. Cập nhật dữ liệu vào state với quy tắc dự phòng ngoại tuyến đầy đủ
+    const dobJp = cand.date_of_birth ? toJapaneseDate(cand.date_of_birth) : undefined;
+    const nameEng = t.full_name_eng || (cand.full_name_vn ? removeVietnameseAccents(cand.full_name_vn).toUpperCase() : cand.full_name_eng);
+    const guardianNameEng = t.guardian_name_en || (cand.guardian_name_vn ? translateGuardianNameOffline(cand.guardian_name_vn) : cand.guardian_name_en);
+    const guardianJobEng = t.guardian_job_en || (cand.guardian_job_vn ? OFFLINE_JOBS_EN[cand.guardian_job_vn.toLowerCase()] || cand.guardian_job_vn : cand.guardian_job_en);
+    const guardianJobJp = t.guardian_job_jp || (cand.guardian_job_vn ? OFFLINE_JOBS_JP[cand.guardian_job_vn.toLowerCase()] || cand.guardian_job_vn : cand.guardian_job_jp);
+
+    setCand(prev => {
+      const updatedCustom: Record<string, string> = { ...(prev.custom_fields || {}) };
+      customFieldDefs.forEach(f => {
+        if (f.requireJp && prev.custom_fields?.[f.id]) {
+          const jpKey = `${f.id}_jp`;
+          const translatedVal = t[`custom_${f.id}_jpn`] || t[`custom_${f.id}`] || t[jpKey];
+          if (translatedVal) {
+            updatedCustom[jpKey] = translatedVal;
+          }
+        }
       });
-      const data = await res.json();
-      if (!res.ok) { showToast(`❌ ${data.error}`, 'error'); return; }
-      const t = data.translations as Record<string, string>;
-      // Áp kết quả vào state
-      const dobJp = cand.date_of_birth ? toJapaneseDate(cand.date_of_birth) : undefined;
-      setCand(prev => ({
+
+      return {
         ...prev,
-        date_of_birth_jp:   dobJp ?? prev.date_of_birth_jp,
-        full_name_katakana: t.ten_phien_am ?? prev.full_name_katakana,
-        address_jp:         t.dia_chi_jpn ?? prev.address_jp,
-        birthplace_jp:      t.noi_sinh_jpn ?? prev.birthplace_jp,
-        guardian_name_jp:   t.nguoi_giam_ho_jpn ?? prev.guardian_name_jp,
-        guardian_address_jp:t.dc_nguoi_gh_jpn ?? prev.guardian_address_jp,
-      }));
-      if (t.nganh_nghe_jpn) setInternshipFieldJp(t.nganh_nghe_jpn);
-      // Học vấn
-      setEdus(prev => prev.map((e, i) => t[`ten_truong_${i + 1}`] ? { ...e, school_name_jp: t[`ten_truong_${i + 1}`] } : e));
-      // Công việc
-      setWorks(prev => prev.map((w, i) => t[`ten_dn_${i + 1}`] ? { ...w, company_name_jp: t[`ten_dn_${i + 1}`] } : w));
-      // Giấy tờ
-      setDocs(prev => prev.map(d => {
-        const docJpDate = d.issue_date ? toJapaneseDate(d.issue_date) : undefined;
-        let placeJp = d.issue_place_jp;
-        if (d.document_type === 'CCCD' && t.noi_cap_cccd_jpn) placeJp = t.noi_cap_cccd_jpn;
-        if (d.document_type === 'Passport' && t.noi_cap_hc_jpn) placeJp = t.noi_cap_hc_jpn;
-        return {
-          ...d,
-          issue_date_jp: docJpDate ?? d.issue_date_jp,
-          issue_place_jp: placeJp,
-        };
-      }));
-      showToast(`✅ Dịch xong ${Object.keys(t).length} trường!`);
-    } catch { showToast('❌ Lỗi kết nối', 'error'); }
-    finally { setTranslatingAll(false); }
-  }, [cand, edus, works, docs, internshipFieldVn, showToast]);
+        date_of_birth_jp:    dobJp ?? prev.date_of_birth_jp,
+        full_name_eng:       nameEng ?? prev.full_name_eng,
+        full_name_katakana:  t.ten_phien_am ?? prev.full_name_katakana,
+        address_jp:          t.dia_chi_jpn ?? prev.address_jp,
+        birthplace_jp:       t.noi_sinh_jpn ?? prev.birthplace_jp,
+        guardian_name_en:    guardianNameEng ?? prev.guardian_name_en,
+        guardian_name_jp:    t.guardian_name_jp ?? prev.guardian_name_jp,
+        guardian_job_en:     guardianJobEng ?? prev.guardian_job_en,
+        guardian_job_jp:     guardianJobJp ?? prev.guardian_job_jp,
+        guardian_address_jp: t.dc_nguoi_gh_jpn ?? prev.guardian_address_jp,
+        skill_summary_jp:    t.kn_tom_tat_jpn ?? prev.skill_summary_jp,
+        purpose_to_japan_jp: t.muc_dich_jpn ?? prev.purpose_to_japan_jp,
+        plan_after_return_jp:t.ke_hoach_jpn ?? prev.plan_after_return_jp,
+        strengths_jp:        t.diem_manh_jpn ?? prev.strengths_jp,
+        weaknesses_jp:       t.diem_yeu_jpn ?? prev.weaknesses_jp,
+        hobbies_jp:          t.so_thich_jpn ?? prev.hobbies_jp,
+        custom_fields:       updatedCustom,
+      };
+    });
+
+    if (t.nganh_nghe_jpn) setInternshipFieldJp(t.nganh_nghe_jpn);
+
+    // Học vấn
+    setEdus(prev => prev.map((e, i) => {
+      const jp = t[`ten_truong_${i + 1}_jpn`] || t[`ten_truong_${i + 1}`];
+      return jp ? { ...e, school_name_jp: jp } : e;
+    }));
+
+    // Quá trình làm việc
+    setWorks(prev => prev.map((w, i) => {
+      const compJp = t[`ten_dn_${i + 1}_jpn`] || t[`ten_dn_${i + 1}`];
+      const jobJp = t[`chuc_vu_${i + 1}_jpn`] || t[`chuc_vu_${i + 1}`] || (w.job_title_vn ? OFFLINE_JOBS_JP[w.job_title_vn.toLowerCase()] : undefined);
+      return {
+        ...w,
+        company_name_jp: compJp ?? w.company_name_jp,
+        job_title_jp: jobJp ?? w.job_title_jp,
+      };
+    }));
+
+    // Kỹ năng
+    setSkills(prev => prev.map((s, i) => {
+      const skillJp = t[`ky_nang_${i + 1}_jpn`] || t[`ky_nang_${i + 1}`];
+      return skillJp ? { ...s, skill_name_jp: skillJp } : s;
+    }));
+
+    // Thành viên gia đình
+    setFamily(prev => prev.map((fm, i) => {
+      const nameEn = t[`tv_ten_${i + 1}_en`] || t[`tv_ten_${i + 1}`] || (fm.full_name ? removeVietnameseAccents(fm.full_name).toUpperCase() : fm.full_name_en);
+      const jobEn = t[`tv_nghe_${i + 1}_en`] || (fm.occupation ? OFFLINE_JOBS_EN[fm.occupation.toLowerCase()] : fm.occupation_en);
+      const jobJp = t[`tv_nghe_${i + 1}_jpn`] || t[`tv_nghe_${i + 1}`] || (fm.occupation ? OFFLINE_JOBS_JP[fm.occupation.toLowerCase()] : fm.occupation_jp);
+      return {
+        ...fm,
+        full_name_en: nameEn ?? fm.full_name_en,
+        occupation_en: jobEn ?? fm.occupation_en,
+        occupation_jp: jobJp ?? fm.occupation_jp,
+      };
+    }));
+
+    // Giấy tờ
+    setDocs(prev => prev.map((d, i) => {
+      const docJpDate = d.issue_date ? toJapaneseDate(d.issue_date) : undefined;
+      let placeJp = d.issue_place_jp;
+      if (d.document_type === 'CCCD') {
+        placeJp = t.noi_cap_cccd_jpn || 'ベトナム社会秩序行政管理警察局';
+      } else if (d.document_type === 'Passport') {
+        placeJp = t.noi_cap_hc_jpn || 'ベトナム出入国管理局';
+      } else {
+        placeJp = t[`noi_cap_doc_${i + 1}`] || placeJp;
+      }
+      return {
+        ...d,
+        issue_date_jp: docJpDate ?? d.issue_date_jp,
+        issue_place_jp: placeJp,
+      };
+    }));
+
+    if (isAiSuccess) {
+      showToast('✅ Đã dịch toàn bộ các trường thành công!');
+    } else {
+      showToast('✅ Đã tự động chuẩn hóa & dịch tất cả các trường (tên EN, ngày tháng JP, nghề nghiệp)!');
+    }
+    setTranslatingAll(false);
+  }, [cand, edus, works, skills, family, docs, internshipFieldVn, customFieldDefs, showToast]);
 
   useEffect(() => {
     // Fetch custom field definitions
@@ -452,21 +590,41 @@ export function CandidateEditor({ profile, onSave, onBack, onDelete, onDownloadR
   ];
 
   // ── TranslateBtn atom (used inline) ─────────────────────────
-  const TranslateBtn = ({ fieldName, value, onResult }: { fieldName: string; value: string; onResult: (v: string) => void }) => (
-    <button
-      type="button"
-      title="Dịch sang tiếng Nhật"
-      disabled={translating === fieldName}
-      onClick={() => translateSingle(fieldName, value, onResult)}
-      className="flex-shrink-0 h-8 px-2 rounded-md border-2 border-[#7C3AED] bg-[#FAF8FF] text-[#7C3AED] font-bold text-xs
-        flex items-center gap-1 hover:bg-[#7C3AED] hover:text-white transition-all
-        active:scale-95 disabled:opacity-50 disabled:cursor-wait">
-      {translating === fieldName
-        ? <span className="animate-spin inline-block w-3 h-3 border-2 border-[#7C3AED]/30 border-t-[#7C3AED] rounded-full" />
-        : <Zap size={11} />}
-      {translating === fieldName ? '' : 'Dịch'}
-    </button>
-  );
+  const TranslateBtn = ({
+    fieldName,
+    value,
+    onResult,
+    lang = 'ja',
+    label
+  }: {
+    fieldName: string;
+    value: string;
+    onResult: (v: string) => void;
+    lang?: 'ja' | 'en';
+    label?: string;
+  }) => {
+    const isEn = lang === 'en';
+    return (
+      <button
+        type="button"
+        title={isEn ? "Dịch sang tiếng Anh" : "Dịch sang tiếng Nhật"}
+        disabled={translating === fieldName}
+        onClick={() => translateSingle(fieldName, value, onResult)}
+        className={`flex-shrink-0 h-8 px-2 rounded-md border-2 font-bold text-xs flex items-center gap-1 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-wait ${
+          isEn
+            ? 'border-[#0284C7] bg-[#F0F9FF] text-[#0284C7] hover:bg-[#0284C7] hover:text-white'
+            : 'border-[#7C3AED] bg-[#FAF8FF] text-[#7C3AED] hover:bg-[#7C3AED] hover:text-white'
+        }`}
+      >
+        {translating === fieldName ? (
+          <span className={`animate-spin inline-block w-3 h-3 border-2 rounded-full ${isEn ? 'border-[#0284C7]/30 border-t-[#0284C7]' : 'border-[#7C3AED]/30 border-t-[#7C3AED]'}`} />
+        ) : (
+          <Zap size={11} />
+        )}
+        {translating === fieldName ? '' : (label || (isEn ? 'Dịch EN' : 'Dịch JP'))}
+      </button>
+    );
+  };
 
   return (
     <div className="artistic-card flex flex-col" style={{ height: 'calc(100vh - 140px)' }}>
@@ -712,39 +870,82 @@ export function CandidateEditor({ profile, onSave, onBack, onDelete, onDownloadR
           {tab === 'guardian' && (
             <>
               <Section title="Người giám hộ / Liên lạc khẩn cấp">
-                <div className="grid grid-cols-2 gap-x-6 gap-y-4">
-                  <Field label="Tên người giám hộ (VN)"><Inp value={cand.guardian_name_vn} onChange={v => setC('guardian_name_vn', v)} placeholder="Nguyễn Văn B (Cha)" /></Field>
-                  <Field label="Tên người giám hộ (Tiếng Anh)">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
+                  <Field label="Tên người giám hộ (VN)">
+                    <Inp value={cand.guardian_name_vn} onChange={v => setC('guardian_name_vn', v)} placeholder="Nguyễn Văn B (Cha)" />
+                  </Field>
+                  <Field label="Tên người giám hộ (Tiếng Anh)" en>
                     <div className="flex gap-2 items-end">
-                      <Inp value={cand.guardian_name_jp} onChange={v => setC('guardian_name_jp', v)} placeholder="NGUYEN VAN B (FATHER)" />
-                      <TranslateBtn fieldName="nguoi_giam_ho_vnm" value={cand.guardian_name_vn ?? ''} onResult={v => setC('guardian_name_jp', v)} />
+                      <Inp value={cand.guardian_name_en} onChange={v => setC('guardian_name_en', v)} placeholder="NGUYEN VAN B (FATHER)" en />
+                      <TranslateBtn fieldName="guardian_name_en" value={cand.guardian_name_vn ?? ''} onResult={v => setC('guardian_name_en', v)} lang="en" />
                     </div>
                   </Field>
-                  <Field label="Địa chỉ người giám hộ (VN)"><Inp value={cand.guardian_address_vn} onChange={v => setC('guardian_address_vn', v)} /></Field>
+                  <Field label="Quan hệ với TTS">
+                    <Sel value={cand.guardian_relationship} onChange={v => setC('guardian_relationship', v)} opts={RELATIONSHIPS} />
+                  </Field>
+
+                  <Field label="Nghề nghiệp người GH (VN)">
+                    <Inp value={cand.guardian_job_vn} onChange={v => setC('guardian_job_vn', v)} placeholder="Làm nông, Nội trợ, Công nhân..." />
+                  </Field>
+                  <Field label="Nghề nghiệp người GH (Tiếng Anh)" en>
+                    <div className="flex gap-2 items-end">
+                      <Inp value={cand.guardian_job_en} onChange={v => setC('guardian_job_en', v)} placeholder="Farmer, Housewife..." en />
+                      <TranslateBtn fieldName="guardian_job_en" value={cand.guardian_job_vn ?? ''} onResult={v => setC('guardian_job_en', v)} lang="en" />
+                    </div>
+                  </Field>
+                  <Field label="Nghề nghiệp người GH (Tiếng Nhật)" jp>
+                    <div className="flex gap-2 items-end">
+                      <Inp value={cand.guardian_job_jp} onChange={v => setC('guardian_job_jp', v)} placeholder="農業, 主婦..." jp />
+                      <TranslateBtn fieldName="guardian_job_jp" value={cand.guardian_job_vn ?? ''} onResult={v => setC('guardian_job_jp', v)} lang="ja" />
+                    </div>
+                  </Field>
+
+                  <Field label="SĐT người giám hộ">
+                    <Inp value={cand.guardian_phone} onChange={v => setC('guardian_phone', v)} placeholder="0912 345 678" />
+                  </Field>
+                  <Field label="Địa chỉ người giám hộ (VN)">
+                    <Inp value={cand.guardian_address_vn} onChange={v => setC('guardian_address_vn', v)} />
+                  </Field>
                   <Field label="Địa chỉ người giám hộ (JP)" jp>
                     <div className="flex gap-2 items-end">
                       <Inp value={cand.guardian_address_jp} onChange={v => setC('guardian_address_jp', v)} jp />
-                      <TranslateBtn fieldName="dc_nguoi_gh_vnm" value={cand.guardian_address_vn ?? ''} onResult={v => setC('guardian_address_jp', v)} />
+                      <TranslateBtn fieldName="dc_nguoi_gh_vnm" value={cand.guardian_address_vn ?? ''} onResult={v => setC('guardian_address_jp', v)} lang="ja" />
                     </div>
                   </Field>
-                  <Field label="SĐT người giám hộ"><Inp value={cand.guardian_phone} onChange={v => setC('guardian_phone', v)} placeholder="0912 345 678" /></Field>
                 </div>
               </Section>
 
               <Section title="Thành viên gia đình">
                 {family.map((fm, i) => (
-                  <div key={i} className="p-4 border-2 border-[#1A1A1A]/15 rounded-lg bg-white mb-4">
+                  <div key={i} className="p-4 border-2 border-[#1A1A1A]/15 rounded-lg bg-white mb-4 shadow-[1.5px_1.5px_0_0_#1A1A1A]/10">
                     <div className="flex items-center justify-between mb-3">
                       <span className="text-xs font-extrabold uppercase text-[#FF4D00]">Thành viên #{i + 1}</span>
                       {family.length > 1 && <RemBtn onClick={() => setFamily(family.filter((_, j) => j !== i))} />}
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                       <Field label="Quan hệ"><Sel value={fm.relationship} onChange={v => setFamily(family.map((f, j) => j === i ? { ...f, relationship: v } : f))} opts={RELATIONSHIPS} /></Field>
                       <Field label="Họ tên"><Inp value={fm.full_name} onChange={v => setFamily(family.map((f, j) => j === i ? { ...f, full_name: v } : f))} /></Field>
                       <Field label="Tuổi"><Inp value={fm.age} onChange={v => setFamily(family.map((f, j) => j === i ? { ...f, age: Number(v) } : f))} type="number" /></Field>
                       <Field label="Sống chung"><Sel value={fm.living_together} onChange={v => setFamily(family.map((f, j) => j === i ? { ...f, living_together: v } : f))} opts={YN} /></Field>
-                      <Field label="Nghề nghiệp / Nơi làm"><Inp value={fm.occupation} onChange={v => setFamily(family.map((f, j) => j === i ? { ...f, occupation: v } : f))} /></Field>
-                      <Field label="Thu nhập hàng tháng"><Inp value={fm.monthly_income} onChange={v => setFamily(family.map((f, j) => j === i ? { ...f, monthly_income: v } : f))} placeholder="10,000,000 VND" /></Field>
+                      
+                      <Field label="Nghề nghiệp (VN)">
+                        <Inp value={fm.occupation} onChange={v => setFamily(family.map((f, j) => j === i ? { ...f, occupation: v } : f))} placeholder="Làm nông, Công nhân..." />
+                      </Field>
+                      <Field label="Nghề nghiệp (Tiếng Anh)" en>
+                        <div className="flex gap-2 items-end">
+                          <Inp value={fm.occupation_en} onChange={v => setFamily(family.map((f, j) => j === i ? { ...f, occupation_en: v } : f))} placeholder="Farmer, Worker..." en />
+                          <TranslateBtn fieldName="job_en" value={fm.occupation ?? ''} onResult={v => setFamily(family.map((f, j) => j === i ? { ...f, occupation_en: v } : f))} lang="en" />
+                        </div>
+                      </Field>
+                      <Field label="Nghề nghiệp (Tiếng Nhật)" jp>
+                        <div className="flex gap-2 items-end">
+                          <Inp value={fm.occupation_jp} onChange={v => setFamily(family.map((f, j) => j === i ? { ...f, occupation_jp: v } : f))} placeholder="農業, 会社員..." jp />
+                          <TranslateBtn fieldName="job_jp" value={fm.occupation ?? ''} onResult={v => setFamily(family.map((f, j) => j === i ? { ...f, occupation_jp: v } : f))} lang="ja" />
+                        </div>
+                      </Field>
+                      <Field label="Thu nhập hàng tháng">
+                        <Inp value={fm.monthly_income} onChange={v => setFamily(family.map((f, j) => j === i ? { ...f, monthly_income: v } : f))} placeholder="10,000,000 VND" />
+                      </Field>
                     </div>
                   </div>
                 ))}

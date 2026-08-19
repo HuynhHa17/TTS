@@ -25,6 +25,7 @@ from core.models import (
     SkillExperience, FamilyMember, CandidateAssignment, Organization,
     AppSettings, to_dict
 )
+from core.form_parser import normalize_phone_str, normalize_id_number
 import config
 
 excel_io_bp = Blueprint("excel_io", __name__)
@@ -279,15 +280,15 @@ def _row_to_candidate_dict(row: list) -> dict:
             "guardian_name_jp":   g(25),
             "guardian_address_vn":g(26),
             "guardian_address_jp":g(27),
-            "guardian_phone":     g(28),
+            "guardian_phone":     normalize_phone_str(g(28)),
             "skill_summary_jp":   g(43),
             "skill_summary_vn":   g(44),
-            "phone":              g(59),
+            "phone":              normalize_phone_str(g(59)),
             "status":             "draft",
         },
         "cccd": {
             "document_type":   "CCCD",
-            "document_number": g(6),
+            "document_number": normalize_id_number(g(6), "CCCD"),
             "issue_date":      _parse_date_str(row[7]) if len(row) > 7 else "",
             "issue_date_jp":   g(8),
             "issue_place_vn":  g(9),
@@ -551,7 +552,7 @@ def export_to_excel():
         for stt, c in enumerate(candidates, start=1):
             row_data = _candidate_to_row(c, stt)
             for col_idx, val in enumerate(row_data, start=1):
-                cell = ws.cell(row=stt + 1, column=col_idx, value=val)
+                cell = ws.cell(row=stt + 1, column=col_idx, value=str(val) if val is not None else "")
                 if col_idx in text_cols:
                     cell.number_format = "@"
 
@@ -599,6 +600,12 @@ def export_template():
         cell.fill = header_fill
         cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
         ws.column_dimensions[openpyxl.utils.get_column_letter(col_idx)].width = 20
+
+    # Ensure all data rows have text format "@" so leading zeros are preserved when users type
+    for row_idx in range(2, 100):
+        for col_idx in range(1, len(headers) + 1):
+            cell = ws.cell(row=row_idx, column=col_idx)
+            cell.number_format = "@"
 
     out = BytesIO()
     wb.save(out)
